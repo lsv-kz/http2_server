@@ -175,7 +175,7 @@ int http2::bytes_to_int(unsigned char prefix, const char *s, int *len, int size)
         else
             break;
     }
-    
+
     int n = pow_(2, pref_len) - 1;
     if (n < 0)
         return -1;
@@ -200,8 +200,8 @@ int http2::parse(Response *r)
     if (flags & 0x20) // PRIORITY (0x20)
         len += 5;
     std::string name;
-    std::string val; 
-        
+    std::string val;
+
     for ( ; len < body.size(); )
     {
         if ((ch = body.get_byte(len++)) < 0)
@@ -242,7 +242,7 @@ int http2::parse(Response *r)
                 }
                 else
                     name_len = ch & 0x7f;
-                
+
                 if ((name_len + len) > body.size())
                 {
                     return -1;
@@ -305,7 +305,7 @@ int http2::parse(Response *r)
 
             len += val_len;
         }
-        else if ((ch >= 0x40) && (ch <= 0x7f)) // <0x41 ... 0x7F><len><val> 
+        else if ((ch >= 0x40) && (ch <= 0x7f)) // <0x41 ... 0x7F><len><val>
         {
             int ind = ch & 0x3f;
             int name_len;
@@ -316,7 +316,7 @@ int http2::parse(Response *r)
                 {
                     return -1;
                 }
-                    
+
                 bool huffman = ch & 0x80;
                 name_len = ch & 0x7f;
                 if (name_len == 0x7f)
@@ -345,7 +345,7 @@ int http2::parse(Response *r)
                     if (ind <= 0)
                         return -1;
                 }
-                    
+
                 if (ind <= 61)
                 {
                     name = static_tab[ind][0];
@@ -370,7 +370,7 @@ int http2::parse(Response *r)
                 if (val_len <= 0)
                     return -1;
             }
-                
+
             if ((val_len + len) > body.size())
             {
                 return -1;
@@ -392,7 +392,7 @@ int http2::parse(Response *r)
                 {
                     return -1;
                 }
-                    
+
                 bool huffman = ch & 0x80;
                 int name_len = ch & 0x7f;
                 if (name_len == 0x7f) // [H]111 1111
@@ -446,7 +446,7 @@ int http2::parse(Response *r)
                 if (val_len <= 0)
                     return -1;
             }
-                
+
             if ((val_len + len) > body.size())
             {
                 return -1;
@@ -480,7 +480,7 @@ int http2::parse(Response *r)
             r->user_agent = val;
         else if (name == "referer")
             r->referer = val;
-        else if (name == "range")   
+        else if (name == "range")
             r->range = val;
         else if (name == "authority")
             r->authority = val;

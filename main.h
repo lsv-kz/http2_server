@@ -69,7 +69,7 @@ enum {
     M_PATCH, M_DELETE, M_TRACE, M_CONNECT
 };
 
-enum OPERATION_HTTP2 { SSL_ACCEPT = 1, PREFACE_MESSAGE, WORK_STREAM, SSL_SHUTDOWN, CLOSE_CONNECT, };
+enum OPERATION_HTTP2 { SSL_ACCEPT = 1, PREFACE_MESSAGE, SEND_SETTINGS, WORK_STREAM, SSL_SHUTDOWN, CLOSE_CONNECT, };
 
 enum IO_STATUS { WAIT = 1, WORK };
 enum DIRECT { TIME_OUT, FROM_CLIENT, TO_CLIENT };
@@ -107,14 +107,14 @@ class Config
     Config& operator=(const Config&);
 
 public:
-    
+
     SSL_CTX *ctx;
-    
+
     std::string ServerSoftware;
 
     std::string ServerAddr;
     std::string ServerPort;
-    
+
     std::string DocumentRoot;
     std::string ScriptPath;
     std::string LogPath;
@@ -146,7 +146,7 @@ public:
 
     uid_t server_uid;
     gid_t server_gid;
-    
+
     fcgi_list_addr *fcgi_list;
     //------------------------------------------------------------------
     Config()
@@ -197,6 +197,7 @@ struct http2
 
     ByteArray body;
     ByteArray frame;
+    ByteArray settings;
     ByteArray frame_win_update;
 
     bool ack_recv;
@@ -237,10 +238,21 @@ struct http2
         max_frame_size = 0;
         num_cgi = 0;
         send_ready = 0;
-        
+
         size_ = 0;
         len_ = err = 0;
         start = end = NULL;
+
+        settings.cpy("\x00\x00\xc\x04\x00\x00\x00\x00\x00" // SETTINGS (type=0x4)
+                    "\x00\x01\x00\x00\x00\x00"             // SETTINGS_HEADER_TABLE_SIZE (0x1)
+                    "\x00\x03\x00\x00\x00\x00", 9 + 12);   // SETTINGS_MAX_CONCURRENT_STREAMS (0x3)
+
+        settings.set_byte((conf->MaxConcurrentStreams>>24) & 0xff, 17);
+        settings.set_byte((conf->MaxConcurrentStreams>>16) & 0xff, 18);
+        settings.set_byte((conf->MaxConcurrentStreams>>8) & 0xff, 19);
+        settings.set_byte(conf->MaxConcurrentStreams & 0xff, 20);
+
+        settings.cat("\x00\x00\x00\x04\x01\x00\x00\x00\x00", 9);
     }
 
     ~http2()
@@ -296,7 +308,7 @@ public:
         int err;
         int poll_event;
     } tls;
-    
+
     http2 h2;
     //------------------------------------------------------------------
     void init();
@@ -354,6 +366,7 @@ public:
     ~EventHandlerClass();
 
     void init(int n);
+
     int wait_conn();
     void add_work_list();
 

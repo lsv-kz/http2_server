@@ -86,7 +86,7 @@ int configure_context(SSL_CTX *ctx)
     }
 
     SSL_CTX_set_alpn_select_cb(ctx, alpn_select_proto_cb, NULL);
-    
+
     return 0;
 }
 //======================================================================
@@ -134,7 +134,7 @@ const char *ssl_strerror(int err)
         case SSL_ERROR_WANT_ACCEPT:
             return "SSL_ERROR_WANT_ACCEPT";
     }
-    
+
     return "?";
 }
 //======================================================================
@@ -206,7 +206,7 @@ int ssl_write(Connect *con, const char *buf, int len)
             con->tls.err = 0;
             return ERR_TRY_AGAIN;
         }
-        print_err(con, "<%s:%d> Error SSL_write(, %p, %d)=%d: %s, errno=%d\n", __func__, __LINE__, 
+        print_err(con, "<%s:%d> Error SSL_write(, %p, %d)=%d: %s, errno=%d\n", __func__, __LINE__,
                     buf, len, ret, ssl_strerror(con->tls.err), errno);
         return -1;
     }

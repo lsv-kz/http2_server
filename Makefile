@@ -2,7 +2,7 @@ CFLAGS = -Wall -O2 -g -std=c++11
 
 CC = c++
 
-#CC = clang++ 
+#CC = clang++
 
 
 OBJSDIR = objs
@@ -32,19 +32,19 @@ http2_server: $(OBJS)
 $(OBJSDIR)/http2_server.o: http2_server.cpp $(DEPS)
 	$(CC) $(CFLAGS) -c http2_server.cpp -o $@
 
-$(OBJSDIR)/fcgi.o: fcgi.cpp main.h string__.h
+$(OBJSDIR)/fcgi.o: fcgi.cpp $(DEPS)
 	$(CC) $(CFLAGS) -c fcgi.cpp -o $@
 
 $(OBJSDIR)/ssl.o: ssl.cpp $(DEPS)
 	$(CC) $(CFLAGS) -c ssl.cpp -o $@
 
-$(OBJSDIR)/scgi.o: scgi.cpp main.h string__.h
+$(OBJSDIR)/scgi.o: scgi.cpp $(DEPS)
 	$(CC) $(CFLAGS) -c scgi.cpp -o $@
 
-$(OBJSDIR)/cgi.o: cgi.cpp  $(DEPS)
+$(OBJSDIR)/cgi.o: cgi.cpp $(DEPS)
 	$(CC) $(CFLAGS) -c cgi.cpp -o $@
 
-$(OBJSDIR)/config.o: config.cpp  $(DEPS)
+$(OBJSDIR)/config.o: config.cpp $(DEPS)
 	$(CC) $(CFLAGS) -c config.cpp -o $@
 
 $(OBJSDIR)/http2.o: http2.cpp $(DEPS)
@@ -53,7 +53,7 @@ $(OBJSDIR)/http2.o: http2.cpp $(DEPS)
 $(OBJSDIR)/classes.o: classes.cpp $(DEPS)
 	$(CC) $(CFLAGS) -c classes.cpp -o $@
 
-$(OBJSDIR)/manager.o: manager.cpp $(DEPS) 
+$(OBJSDIR)/manager.o: manager.cpp $(DEPS)
 	$(CC) $(CFLAGS) -c manager.cpp -o $@
 
 $(OBJSDIR)/event_handler.o: event_handler.cpp $(DEPS)

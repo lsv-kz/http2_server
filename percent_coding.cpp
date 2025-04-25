@@ -93,7 +93,7 @@ int encode(const char *s_in, String& s_out)
     char not_encode[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
         "abcdefghijklmnopqrstuvwxyz" "0123456789" "/:-_.!~*'()";
 
-    if (!s_in) 
+    if (!s_in)
         return 0;
 
     while ((c = *s_in++))

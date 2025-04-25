@@ -58,9 +58,9 @@ void create_conf_file(const char *path)
 
     fprintf(f, "ListenBacklog        128\n");
     fprintf(f, "TcpNoDelay           y \n\n");
-    
+
     fprintf(f, "MaxAcceptConnections     5000\n\n");
-    
+
     fprintf(f, "DataBufSize          16384\n\n");
 
     fprintf(f, "Timeout              120 # seconds\n");

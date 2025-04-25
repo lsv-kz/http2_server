@@ -61,7 +61,7 @@ void ssl_shutdown(Connect *r)
 {
     if (r->tls.ssl)
     {
-        if ((r->tls.err != SSL_ERROR_SSL) && 
+        if ((r->tls.err != SSL_ERROR_SSL) &&
             (r->tls.err != SSL_ERROR_SYSCALL))
         {
             int ret = SSL_shutdown(r->tls.ssl);
@@ -162,7 +162,7 @@ void manager(int sockServer)
         if (clientSocket == -1)
         {
             print_err("<%s:%d>  Error accept(): %s\n", __func__, __LINE__, strerror(errno));
-            if ((errno == EMFILE) || (errno == ENFILE)) // (errno == EINTR) || 
+            if ((errno == EMFILE) || (errno == ENFILE)) // (errno == EINTR)
                 continue;
             break;
         }
@@ -239,7 +239,6 @@ void manager(int sockServer)
 
         req->tls.poll_event = POLLIN | POLLOUT;
         req->h2.type_op = SSL_ACCEPT;
-print_err(req, "<%s:%d> new connect, fd=%d\n", __func__, __LINE__, req->clientSocket);
         start_conn();
         push_pollin_list(req);
     }

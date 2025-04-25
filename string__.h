@@ -34,7 +34,7 @@ class String
             if (reserve(n + n/2))
                 return;
         }
-        
+
         buf[buf_len++] = ch;
         buf[buf_len] = 0;
     }
@@ -379,7 +379,7 @@ public:
     //------------------------------------------------------------------
     unsigned long size() const { return buf_len; }
     unsigned long capacity() const { return buf_size; }
-    
+
     void reduce(unsigned long n)
     {
         if (n >= buf_len)

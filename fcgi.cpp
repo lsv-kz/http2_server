@@ -6,7 +6,7 @@ using namespace std;
 void fcgi_set_header(ByteArray* ba, unsigned char type)
 {
     int dataLen = ba->size() - 8;
-    
+
     ba->set_byte(FCGI_VERSION_1, 0);
     ba->set_byte((unsigned char)type, 1);
     ba->set_byte((unsigned char) ((1 >> 8) & 0xff), 2);
@@ -28,7 +28,7 @@ void fcgi_set_param(Connect *con, Response *resp)
 
         char s[8], *p = s;
         int i = 0;
-        
+
         if (len_name < 0x80)
         {
             *(p++) = (unsigned char)len_name;
@@ -56,7 +56,7 @@ void fcgi_set_param(Connect *con, Response *resp)
             *(p++) = (unsigned char)len_val;
             i += 4;
         }
-        
+
         resp->cgi.buf_param.cat(s, i);
         resp->cgi.buf_param.cat(resp->cgi.vPar[resp->cgi.i_param].name.c_str(), len_name);
         if (len_val > 0)
@@ -118,7 +118,7 @@ int fcgi_create_params(Connect *con, Response *resp)
     param.val = resp->decode_path;
     resp->cgi.vPar.push_back(param);
     ++i;
-    
+
     param.name = "DOCUMENT_URI";
     param.val = resp->uri;
     resp->cgi.vPar.push_back(param);
@@ -133,7 +133,7 @@ int fcgi_create_params(Connect *con, Response *resp)
     param.val = "HTTP2";
     resp->cgi.vPar.push_back(param);
     ++i;
-    
+
     param.name = "SERVER_PORT";
     param.val = conf->ServerPort;
     resp->cgi.vPar.push_back(param);
@@ -244,7 +244,7 @@ int fcgi_create_connect(Connect *con, Response *resp)
         print_err(con, "<%s:%d> ? req->scriptType=%d\n", __func__, __LINE__, resp->cgi.cgi_type);
         return -RS500;
     }
-    
+
     if (resp->cgi.cgi_type == PHPFPM)
         resp->cgi.socket = &conf->PathPHP;
 
@@ -302,7 +302,7 @@ void EventHandlerClass::fcgi_worker(Connect* con, Response *resp, struct pollfd 
             }
 
             resp->cgi.timer = 0;
-            resp->cgi.buf_param.offset_inc(ret);
+            resp->cgi.buf_param.offset_add(ret);
             if (resp->cgi.buf_param.size_remain() == 0)
             {
                 resp->cgi.buf_param.init();
@@ -311,8 +311,8 @@ void EventHandlerClass::fcgi_worker(Connect* con, Response *resp, struct pollfd 
         }
         else
         {
-            print_err("<%s:%d> Error 0x%02X(0x%02X), fd=%d\n", __func__, __LINE__, poll_fd->revents, poll_fd->events, poll_fd->fd);
-			resp_502(resp);
+            print_err(con, "<%s:%d> Error 0x%02X(0x%02X), fd=%d\n", __func__, __LINE__, poll_fd->revents, poll_fd->events, poll_fd->fd);
+            resp_502(resp);
         }
     }
     else if (resp->cgi.fcgi_op == FASTCGI_PARAMS)
@@ -333,12 +333,12 @@ void EventHandlerClass::fcgi_worker(Connect* con, Response *resp, struct pollfd 
                 {
                     resp_502(resp);
                 }
-    
+
                 return;
             }
 
             resp->cgi.timer = 0;
-            resp->cgi.buf_param.offset_inc(ret);
+            resp->cgi.buf_param.offset_add(ret);
             if (resp->cgi.buf_param.size_remain() == 0)
             {
                 if (resp->cgi.buf_param.size() == 8)
@@ -356,8 +356,8 @@ void EventHandlerClass::fcgi_worker(Connect* con, Response *resp, struct pollfd 
         }
         else
         {
-			resp_502(resp);
-		}
+            resp_502(resp);
+        }
     }
     else if (resp->cgi.fcgi_op == FASTCGI_STDIN)
     {
@@ -376,7 +376,7 @@ void EventHandlerClass::fcgi_worker(Connect* con, Response *resp, struct pollfd 
         resp->cgi.send_to_cgi += ret;
         if (ret != resp->post_data.size_remain())
         {
-            resp->post_data.offset_inc(ret);
+            resp->post_data.offset_add(ret);
             resp->cgi.timer = 0;
             resp->send_ready |= RECV_FROM_CLIENT_WAIT;
         }
@@ -463,7 +463,6 @@ void EventHandlerClass::fcgi_worker(Connect* con, Response *resp, struct pollfd 
                     {
                         resp->html.cat(buf, ret);
                         fcgi_get_headers(con, resp);
-                        
                     }
                     else
                     {
@@ -510,7 +509,7 @@ void EventHandlerClass::fcgi_get_headers(Connect* con, Response *resp)
             }
         }
     }
-    
+
     if (p)
     {
         const char *p3 = NULL;
@@ -533,14 +532,14 @@ void EventHandlerClass::fcgi_get_headers(Connect* con, Response *resp)
                 else
                     cont_type[j++] = ch;
             }
-            
+
             cont_type[j] = 0;
             set_frame_headers(resp);
             add_header(resp, 8);
             add_header(resp, 31, cont_type);
             resp->create_headers = true;
-            resp->html.offset_inc(p - resp->html.ptr());
-            
+            resp->html.offset_add(p - resp->html.ptr());
+
             if (resp->html.size() > resp->html.get_offset())
             {
                 int offs = resp->html.get_offset();

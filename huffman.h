@@ -11,7 +11,7 @@ class HuffmanCode
 {
     ByteArray bits_text;
     ByteArray buf_out;
-    
+
     HuffmanCode(const HuffmanCode&);
     HuffmanCode& operator=(const HuffmanCode&);
 
@@ -61,7 +61,7 @@ public:
             char end[] = "11111111";
             bits_text.cat(end,  n);
         }
-        
+
         return len_in;
     }
     //------------------------------------------------------------------
@@ -155,7 +155,7 @@ public:
     int decode_hex(const char *s_in, int len_in, std::string& s_out)
     {
         char s[len_in];
-        
+
         if (len_in <= 0)
         {
             fprintf(stderr, "<%s:%d> Error len=%d\n", __func__, __LINE__, len_in);

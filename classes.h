@@ -17,10 +17,10 @@ struct Param
     std::string val;
 };
 
-enum FRAME_TYPE 
+enum FRAME_TYPE
 {
-    DATA, HEADERS, PRIORITY, RST_STREAM, SETTINGS, PUSH_PROMISE, PING, 
-    GOAWAY, WINDOW_UPDATE, CONTINUATION, ALTSVC, ORIGIN = 0x0C, CACHE_DIGEST, 
+    DATA, HEADERS, PRIORITY, RST_STREAM, SETTINGS, PUSH_PROMISE, PING,
+    GOAWAY, WINDOW_UPDATE, CONTINUATION, ALTSVC, ORIGIN = 0x0C, CACHE_DIGEST,
 };
 
 enum HTTP2_FLAGS { FLAG_ACK = 0x1, FLAG_END_STREAM = 0x1, FLAG_END_HEADERS = 0x4, FLAG_PADDED = 0x8, FLAG_PRIORITY = 0x20 };
@@ -47,13 +47,13 @@ class DynamicTable
     int table_len;
     int offset;
     int err;
-    
+
     DynamicTable();
     DynamicTable(const DynamicTable&);
     DynamicTable& operator= (const DynamicTable&);
-    
+
 public:
-    
+
     DynamicTable(int n, int offs)
     {
         table_size = n;
@@ -108,7 +108,7 @@ public:
             fprintf(stderr, "<%s:%d> Error ind=%d\n", __func__, __LINE__, n);
             return NULL;
         }
-        
+
         return &table[n - offset];
     }
 };
@@ -117,20 +117,20 @@ struct Response
 {
     Response *prev;
     Response *next;
-    
+
     int id;
     int len;
     FRAME_TYPE type;
     int flags;
     time_t Time;
-    
+
     long window_update;
-    
+
     std::string method;
     std::string path;
     std::string decode_path;
     char uri[4096];
-    
+
     std::string authority;
     std::string host;
     std::string user_agent;
@@ -170,7 +170,7 @@ struct Response
         bool end_post_data;
         bool cgi_end;
         time_t timer;
-        
+
         std::string path;
         std::string script_name;
         std::string query_string;
@@ -187,7 +187,7 @@ struct Response
         int size_par;
         std::vector <Param> vPar;
         ByteArray buf_param;
-        
+
         SCGI_OPERATION scgi_op;
 
         FCGI_OPERATION fcgi_op;
@@ -199,7 +199,7 @@ struct Response
         long send_to_cgi;
         long window_update;
     } cgi;
-    
+
     Response()
     {
         status = 0;
@@ -237,7 +237,7 @@ struct Response
         if (cgi.from_script > 0)
             close(cgi.from_script);
     }
-    
+
 private:
     Response(const Response&);
     Response& operator=(const Response&);

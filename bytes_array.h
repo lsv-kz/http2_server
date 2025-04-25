@@ -8,12 +8,11 @@ class ByteArray
 {
     ByteArray *prev;
     ByteArray *next;
-    
+
     char *buf;
     int buf_size;
     int buf_len;
     int offset;
-    
     //------------------------------------------------------------------
     int resize(int size_new)
     {
@@ -38,12 +37,12 @@ class ByteArray
 
         return 0;
     }
-    
+
     ByteArray(const ByteArray&);
     ByteArray& operator=(const ByteArray&);
-    
+
 public:
-    
+
     ByteArray()
     {
         buf = NULL;
@@ -55,16 +54,13 @@ public:
     {
         if (buf)
         {
-            //fprintf(stderr, "<%s:%d> ~~~ delete ByteArray %p, size=%d, len=%d\n", __func__, __LINE__, buf, buf_size, buf_len);
             delete [] buf;
             buf = NULL;
-//fprintf(stderr, "<%s:%d> ~~~ delete ByteArray %p, size=%d, len=%d\n", __func__, __LINE__, buf, buf_size, buf_len);
         }
     }
     //------------------------------------------------------------------
     void init()
     {
-        //fprintf(stderr, "<%s:%d> !!!!! init ByteArray, size=%d, len=%d, offs=%d\n", __func__, __LINE__, buf_size, buf_len, offset);
         buf_len = offset = 0;
     }
     //------------------------------------------------------------------
@@ -233,7 +229,7 @@ public:
     int size() { return buf_len; }
     int size_remain() { return buf_len - offset; }
     int get_offset () { return offset; }
-    int offset_inc (int n)
+    int offset_add (int n)
     {
         if ((offset + n) > buf_len)
         {

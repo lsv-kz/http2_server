@@ -18,8 +18,16 @@ EventHandlerClass::EventHandlerClass()
     num_request = 0;
     close_thr = num_wait = num_work = num_cgi = 0;
     work_list_start = work_list_end = wait_list_start = wait_list_end = NULL;
-    
+}
+//----------------------------------------------------------------------
+void EventHandlerClass::init(int n)
+{
     conn_array = new(nothrow) Connect* [conf->MaxAcceptConnections];
+    if (!conn_array)
+    {
+        print_err("<%s:%d> Error malloc(): %s\n", __func__, __LINE__, strerror(errno));
+        exit(1);
+    }
 
     poll_fd = new(nothrow) struct pollfd [conf->MaxAcceptConnections];
     if (!poll_fd)
@@ -27,11 +35,6 @@ EventHandlerClass::EventHandlerClass()
         print_err("<%s:%d> Error malloc(): %s\n", __func__, __LINE__, strerror(errno));
         exit(1);
     }
-}
-//----------------------------------------------------------------------
-void EventHandlerClass::init(int n)
-{
-    
 }
 //----------------------------------------------------------------------
 void EventHandlerClass::del_from_list(Connect *r)
@@ -109,7 +112,7 @@ int EventHandlerClass::cgi_set_poll()
                 resp->cgi.timer = t;
             if ((t - resp->cgi.timer) >= conf->TimeoutCGI)
             {
-                print_err(c, "<%s:%d> TimeoutCGI=%ld, post_data.size()=%d, io_status=%d, cgi.op=%d, id=%d\n", __func__, __LINE__, 
+                print_err(c, "<%s:%d> TimeoutCGI=%ld, post_data.size()=%d, io_status=%d, cgi.op=%d, id=%d\n", __func__, __LINE__,
                         t - resp->cgi.timer, resp->post_data.size(), c->io_status, resp->cgi.op, resp->id);
                 resp_504(resp);
             }
@@ -213,6 +216,7 @@ int EventHandlerClass::cgi_set_poll()
     }
 
     //-------------------------- loop Connects -------------------------
+    int i = 0;
     for ( int conn_ind = 0; conn_ind < num_wait; ++conn_ind)
     {
         c = conn_array[conn_ind];
@@ -223,11 +227,10 @@ int EventHandlerClass::cgi_set_poll()
         if (!resp)
             continue;
         //------------------------ loop Responses -----------------------
-        int i = 0;
         for ( ; resp && (i < c->h2.num_cgi); resp = resp_next)
         {
             resp_next = resp->next;
-            
+
             if (resp->content != DYN_PAGE)
                 continue;
 
@@ -261,6 +264,7 @@ int EventHandlerClass::set_poll()
     num_work = num_wait = 0;
     time_t t = time(NULL);
     Connect *c = work_list_start, *next = NULL;
+    int i = 0;
     for ( ; c; c = next)
     {
         next = c->next;
@@ -270,10 +274,10 @@ int EventHandlerClass::set_poll()
 
         if ((t - c->sock_timer) >= conf->Timeout)
         {
-            print_err(c, "<%s:%d> Timeout=%ld, %s, io_status=%d, SSL_pending()=%d\n", __func__, __LINE__, 
+            print_err(c, "<%s:%d> Timeout=%ld, %s, io_status=%d, SSL_pending()=%d\n", __func__, __LINE__,
                         t - c->sock_timer, get_str_operation(c->h2.type_op), c->io_status, SSL_pending(c->tls.ssl));
             {
-                if ((c->h2.type_op == SSL_ACCEPT) || 
+                if ((c->h2.type_op == SSL_ACCEPT) ||
                     (c->h2.type_op == SSL_SHUTDOWN))
                 {
                     c->h2.type_op = CLOSE_CONNECT;
@@ -285,9 +289,13 @@ int EventHandlerClass::set_poll()
         }
         else
         {
-            conn_array[num_wait] = c;
+            num_wait = i++;
 
-            if ((c->h2.type_op == PREFACE_MESSAGE) || (c->h2.type_op == SSL_ACCEPT) || (c->h2.type_op == SSL_SHUTDOWN))
+            if ((c->h2.type_op == PREFACE_MESSAGE) ||
+                (c->h2.type_op == SSL_ACCEPT) ||
+                (c->h2.type_op == SSL_SHUTDOWN) ||
+                (c->h2.type_op == SEND_SETTINGS)
+            )
             {
                 poll_fd[num_wait].fd = c->clientSocket;
                 if (c->io_status == WORK)
@@ -301,9 +309,9 @@ int EventHandlerClass::set_poll()
                         poll_fd[num_wait].events = POLLIN;
                     else if ((c->h2.type_op == SSL_ACCEPT) || (c->h2.type_op == SSL_SHUTDOWN))
                         poll_fd[num_wait].events = c->tls.poll_event;
+                    else if (c->h2.type_op == SEND_SETTINGS)
+                        poll_fd[num_wait].events = POLLOUT;
                 }
-                
-                ++num_wait;
             }
             else
             {
@@ -319,10 +327,7 @@ int EventHandlerClass::set_poll()
 
                 Response *resp_next = NULL, *resp = c->h2.get();
                 if (!resp)
-                {
-                    ++num_wait;
                     continue;
-                }
 
                 if (c->h2.frame_win_update.size())
                     poll_fd[num_wait].events |= POLLOUT;
@@ -335,18 +340,18 @@ int EventHandlerClass::set_poll()
                         poll_fd[num_wait].events &= (~POLLIN);
                     }
 
-                    if ((resp->frame_win_update.size() || resp->data.size() || resp->headers.size()) && 
+                    if ((resp->frame_win_update.size() || resp->data.size() || resp->headers.size()) &&
                       ( !(poll_fd[num_wait].events & POLLOUT) )
                     )
                     {
                         poll_fd[num_wait].events |= POLLOUT;
                     }
                 }
-                
-                ++num_wait;
             }
         }
     }
+
+    num_wait = i;
     return 0;
 }
 //----------------------------------------------------------------------
@@ -375,14 +380,18 @@ int EventHandlerClass::poll_worker()
         if (num_work == 0)
             return 0;
     }
-//print_err("<%s:%d> num_wait=%d, num_work=%d, poll()=%d\n", __func__, __LINE__, num_wait, num_work, ret_poll);
-    int i = 0;
-    Connect *con = work_list_start;
-    for ( ; i < num_wait; ++i)
-    {
-        con = conn_array[i];
 
-        if ((con->h2.type_op == PREFACE_MESSAGE) || (con->h2.type_op == SSL_ACCEPT) || (con->h2.type_op == SSL_SHUTDOWN))
+    int i = 0;
+    Connect *con = work_list_start, *next = NULL;
+    for ( ;  con; con = next, ++i)
+    {
+        next = con->next;
+
+        if ((con->h2.type_op == PREFACE_MESSAGE) ||
+            (con->h2.type_op == SSL_ACCEPT) ||
+            (con->h2.type_op == SSL_SHUTDOWN) ||
+            (con->h2.type_op == SEND_SETTINGS)
+        )
         {
             if (con->io_status == WORK)
             {
@@ -396,11 +405,11 @@ int EventHandlerClass::poll_worker()
             }
             continue;
         }
-        
+
         int revents = poll_fd[i].revents;
         int events = poll_fd[i].events;
         int fd = poll_fd[i].fd;
-//print_err("<%s:%d> con->io_status=%d revents=0x%02X, events=0x%02X, fd=%d\n", __func__, __LINE__, con->io_status, revents, events, fd);
+
         if (con->io_status == WORK)
         {
             con->fd_revents = POLLIN;
@@ -436,7 +445,7 @@ int EventHandlerClass::poll_worker()
         else if (revents)
         {
             print_err(con, "<%s:%d> !!! Error: fd=%d, events/revents=0x%x/0x%x\n", __func__, __LINE__, fd, events, revents);
-            if ((con->h2.type_op == SSL_ACCEPT) || 
+            if ((con->h2.type_op == SSL_ACCEPT) ||
                 (con->h2.type_op == SSL_SHUTDOWN))
             {
                 con->h2.type_op = CLOSE_CONNECT;
@@ -513,7 +522,6 @@ int EventHandlerClass::set_pollfd_array(Connect *r, int i)
     r->fd_events = poll_fd[i].events;
     return 0;
 }
-
 //======================================================================
 void event_handler(int n_thr)
 {

@@ -14,12 +14,12 @@ int scgi_set_size_data(Connect* con, Response *resp)
         if (size == 0)
             break;
     }
-    
+
     if (size != 0)
         return -1;
 
     resp->cgi.buf_param.cat(",", 1);
-    resp->cgi.buf_param.offset_inc(i);
+    resp->cgi.buf_param.offset_add(i);
 
     return 0;
 }
@@ -95,7 +95,7 @@ int scgi_create_params(Connect *con, Response *resp)
         param.val = "0";
         resp->cgi.vPar.push_back(param);
         ++i;
-        
+
         param.name = "CONTENT_TYPE";
         param.val = "";
         resp->cgi.vPar.push_back(param);
@@ -136,7 +136,7 @@ int scgi_create_params(Connect *con, Response *resp)
     param.val = resp->uri;
     resp->cgi.vPar.push_back(param);
     ++i;
-    
+
     param.name = "DOCUMENT_URI";
     param.val = resp->decode_path;
     resp->cgi.vPar.push_back(param);
@@ -151,7 +151,7 @@ int scgi_create_params(Connect *con, Response *resp)
     param.val = "HTTP2";
     resp->cgi.vPar.push_back(param);
     ++i;
-    
+
     param.name = "SERVER_PORT";
     param.val = conf->ServerPort;
     resp->cgi.vPar.push_back(param);
@@ -243,7 +243,7 @@ int scgi_set_param(Connect *con, Response *resp)
 
         resp->cgi.buf_param.cat("\0", 1);
     }
-    
+
     if(resp->cgi.i_param < resp->cgi.size_par)
     {
         print_err(con, "<%s:%d> Error: size of param > size of buf\n", __func__, __LINE__);
@@ -251,7 +251,7 @@ int scgi_set_param(Connect *con, Response *resp)
     }
 
     if (resp->cgi.buf_param.size())
-    {      
+    {
         scgi_set_size_data(con, resp);
     }
     else
@@ -284,7 +284,7 @@ void EventHandlerClass::scgi_worker(Connect* con, Response *resp, struct pollfd 
             }
 
             resp->cgi.timer = 0;
-            resp->cgi.buf_param.offset_inc(ret);
+            resp->cgi.buf_param.offset_add(ret);
             if (resp->cgi.buf_param.size_remain() == 0)
             {
                 resp->cgi.buf_param.init();
@@ -311,7 +311,7 @@ void EventHandlerClass::scgi_worker(Connect* con, Response *resp, struct pollfd 
         else
         {
             print_err("<%s:%d> Error 0x%02X(0x%02X), fd=%d\n", __func__, __LINE__, poll_fd->revents, poll_fd->events, poll_fd->fd);
-			resp_502(resp);
+            resp_502(resp);
         }
     }
 }

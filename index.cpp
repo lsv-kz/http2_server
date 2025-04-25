@@ -200,7 +200,7 @@ void create_index_html(Connect *r, char **list, int numFiles, string& path, Resp
             resp->html.cat_str("\">");
             resp->html.cat_str(list[i]);
             resp->html.cat_str("</a></td><td align=\"right\">");
-            resp->html.cat_str(size_s); 
+            resp->html.cat_str(size_s);
             resp->html.cat_str(" bytes</td></tr>\r\n");
         }
     }
@@ -222,9 +222,8 @@ void create_index_html(Connect *r, char **list, int numFiles, string& path, Resp
               "         opacity: 0.7\">^</a>\r\n"
               " </body>\r\n"
               "</html>");
-    //------------------------------------------------------------------
+
     resp->send_cont_length = resp->html.size();
-    print_err(r, "<%s:%d> content_length %lld bytes, id: %d\n", __func__, __LINE__, resp->send_cont_length, resp->id);
 }
 //======================================================================
 int index_dir(Connect *r, string& path, Response *resp)

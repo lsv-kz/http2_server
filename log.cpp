@@ -46,7 +46,7 @@ void create_error_logfile(const string& log_dir)
         cerr << "  Error create log_err: " << fileName.c_str() << "\n";
         exit(1);
     }
-    
+
     dup2(flog_err, STDERR_FILENO);
 }
 //======================================================================

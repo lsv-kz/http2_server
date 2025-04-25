@@ -154,6 +154,8 @@ const char *get_str_operation(OPERATION_HTTP2 n)
             return "SSL_ACCEPT";
         case PREFACE_MESSAGE:
             return "PREFACE_MESSAGE";
+        case SEND_SETTINGS:
+            return "SEND_SETTINGS";
         case WORK_STREAM:
             return "WORK_STREAM";
         case SSL_SHUTDOWN:
@@ -417,15 +419,15 @@ void set_frame(Response *resp, char *s, int len, int type, HTTP2_FLAGS flags, in
     s[0] = (len>>16) & 0xff;
     s[1] = (len>>8) & 0xff;
     s[2] = len & 0xff;
-    
+
     s[3] = (unsigned char)type;
     s[4] = (unsigned char)flags;
-    
+
     s[5] = (id>>24) & 0x7f;
     s[6] = (id>>16) & 0xff;
     s[7] = (id>>8) & 0xff;
     s[8] = id & 0xff;
-    
+
     if (type == HEADERS)
         resp->send_ready |= FRAME_HEADERS_READY;
     else if (type == DATA)
@@ -436,16 +438,16 @@ void set_frame_headers(Response *resp)
 {
     int id = resp->id;
     resp->headers.cpy("\0\0\0\1\4\0\0\0\0", 9);
-    
+
     int len = resp->headers.size() - 9;
     resp->headers.set_byte((len>>16) & 0xff, 0);
     resp->headers.set_byte((len>>8) & 0xff, 1);
     resp->headers.set_byte(len & 0xff, 2);
-    
+
     resp->headers.set_byte((id>>24) & 0x7f, 5);
     resp->headers.set_byte((id>>16) & 0xff, 6);
     resp->headers.set_byte((id>>8) & 0xff, 7);
-    resp->headers.set_byte(id & 0xff, 8); 
+    resp->headers.set_byte(id & 0xff, 8);
     resp->send_ready |= FRAME_HEADERS_READY;
 }
 //======================================================================
@@ -483,7 +485,7 @@ void set_frame_window_update(Response *resp, int len)
     int id = resp->id;
     char s[] = "\x00\x00\x04\x08\x00\x00\x00\x00\x00"  // 0-8
                "\x00\x00\x00\x00";                     // 9-12
-    
+
     resp->frame_win_update.cpy(s, 13);
 
     resp->frame_win_update.set_byte((len>>24) & 0xff, 9);
@@ -544,7 +546,7 @@ void set_frame_data(Response *resp, int len, int flag)
     resp->data.set_byte((id>>16) & 0xff, 6);
     resp->data.set_byte((id>>8) & 0xff, 7);
     resp->data.set_byte(id & 0xff, 8);
-    
+
     resp->send_ready |= FRAME_DATA_READY;
 }
 //======================================================================
@@ -647,11 +649,11 @@ int set_frame_data(Connect *con, Response *resp)
                 con->err = -1;
                 return -1;
             }
-            
+
             int flag = (resp->send_cont_length > 0) ? 0 : FLAG_END_STREAM;
             set_frame_data(resp, data_len, flag);
             resp->data.cat(resp->html.ptr_remain(), data_len);
-            resp->html.offset_inc(data_len);
+            resp->html.offset_add(data_len);
         }
     }
 
@@ -674,7 +676,7 @@ int set_response(Connect *con, Response *resp)
         {
             return -1;
         }
-        
+
         resp->cgi.query_string = p + 1;
     }
     else

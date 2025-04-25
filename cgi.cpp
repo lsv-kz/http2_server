@@ -51,7 +51,7 @@ int cgi_fork(Connect *con, Response *resp, int* serv_cgi, int* cgi_serv)
         resp->cgi.path = conf->DocumentRoot;
         resp->cgi.script_name = resp->uri;
     }
-    
+
     resp->cgi.path += resp->cgi.script_name;
     if (stat(resp->cgi.path.c_str(), &st) == -1)
     {
@@ -138,8 +138,8 @@ int cgi_fork(Connect *con, Response *resp, int* serv_cgi, int* cgi_serv)
         {
             execl(conf->PathPHP.c_str(), base_name(conf->PathPHP.c_str()), NULL);
         }
-        print_err(con, "<%s:%d> Error execl(%s, %s): %s\n", __func__, __LINE__, 
-		                 resp->cgi.path.c_str(), base_name(resp->cgi.path.c_str()), strerror(errno));
+        print_err(con, "<%s:%d> Error execl(%s, %s): %s\n", __func__, __LINE__,
+                        resp->cgi.path.c_str(), base_name(resp->cgi.path.c_str()), strerror(errno));
 
     to_pipe:
         char err_msg[] = "Status: 500 Internal Server Error\r\n"
@@ -254,7 +254,7 @@ int EventHandlerClass::cgi_stdin(Connect *con, Response *resp, int fd)
     int ret = write(fd, resp->post_data.ptr_remain(), resp->post_data.size_remain());
     if (ret <= 0)
     {
-        if (errno == EAGAIN) 
+        if (errno == EAGAIN)
         {
             return ERR_TRY_AGAIN;
         }
@@ -269,8 +269,7 @@ int EventHandlerClass::cgi_stdin(Connect *con, Response *resp, int fd)
     resp->cgi.send_to_cgi += ret;
     if (ret != resp->post_data.size_remain())
     {
-        //print_err(con, "<%s:%d> !!!!! Error cgi_stdin send to cgi=%d(%d) id=%d\n", __func__, __LINE__, ret, resp->post_data.size_remainder(), resp->id);
-        resp->post_data.offset_inc(ret);
+        resp->post_data.offset_add(ret);
         resp->cgi.timer = 0;
         resp->send_ready |= RECV_FROM_CLIENT_WAIT;
     }
@@ -313,7 +312,7 @@ int EventHandlerClass::cgi_stdout(Connect *con, Response *resp, int fd)
     int ret = read(fd, buf, sizeof(buf) - 1);
     if (ret == -1)
     {
-        if (errno == EAGAIN) 
+        if (errno == EAGAIN)
         {
             return ERR_TRY_AGAIN;
         }
@@ -375,14 +374,14 @@ void EventHandlerClass::cgi_worker(Connect *c, Response *resp, struct pollfd *po
     int revents = poll_fd->revents;
     int events = poll_fd->events;
     int fd = poll_fd->fd;
-    
+
     if (resp->cgi.op == CGI_STDIN)
     {
         if (resp->cgi.cgi_type <= PHPCGI)
         {
             if (resp->cgi.to_script != fd)
             {
-                print_err(c, "<%s:%d> Error cgi.to_script=%d, fd=%d, id=%d\n", __func__, __LINE__, 
+                print_err(c, "<%s:%d> Error cgi.to_script=%d, fd=%d, id=%d\n", __func__, __LINE__,
                                         resp->cgi.to_script, fd, resp->id);
                 resp_500(resp);
                 return;
@@ -412,7 +411,7 @@ void EventHandlerClass::cgi_worker(Connect *c, Response *resp, struct pollfd *po
         }
         else if (revents)
         {
-            print_err(c, "<%s:%d> Error events/revents=0x%02X/0x%02X, fd=%d,   id=%d\n", __func__, __LINE__, 
+            print_err(c, "<%s:%d> Error events/revents=0x%02X/0x%02X, fd=%d,   id=%d\n", __func__, __LINE__,
                     events, revents, fd, resp->id);
             resp_502(resp);
         }
@@ -423,7 +422,7 @@ void EventHandlerClass::cgi_worker(Connect *c, Response *resp, struct pollfd *po
         {
             if (resp->cgi.from_script != fd)
             {
-                print_err(c, "<%s:%d> Error cgi.from_script=%d, fd=%d\n", __func__, __LINE__, 
+                print_err(c, "<%s:%d> Error cgi.from_script=%d, fd=%d\n", __func__, __LINE__,
                                         resp->cgi.from_script, fd);
                 resp_502(resp);
                 return;
@@ -504,7 +503,7 @@ void EventHandlerClass::cgi_worker(Connect *c, Response *resp, struct pollfd *po
                                         resp->cgi.from_script = -1;
                                     }
                                 }
-                                
+
                                 resp->cgi.cgi_end = true;
                                 return;
                             }
@@ -524,13 +523,13 @@ void EventHandlerClass::cgi_worker(Connect *c, Response *resp, struct pollfd *po
                                 else
                                     cont_type[j++] = ch;
                             }
-                
+
                             cont_type[j] = 0;
                             set_frame_headers(resp);
                             add_header(resp, 8);
                             add_header(resp, 31, cont_type);
                             resp->create_headers = true;
-                            resp->html.offset_inc(p - resp->html.ptr());
+                            resp->html.offset_add(p - resp->html.ptr());
 
                             if (resp->html.size() > resp->html.get_offset())
                             {
@@ -555,11 +554,11 @@ void EventHandlerClass::cgi_worker(Connect *c, Response *resp, struct pollfd *po
         }
         else if (revents)
         {
-            print_err(c, "<%s:%d> events/revents=0x%02X/0x%02X, fd=%d, to=%d, from=%d,   id=%d\n", __func__, __LINE__, 
+            print_err(c, "<%s:%d> events/revents=0x%02X/0x%02X, fd=%d, to=%d, from=%d,   id=%d\n", __func__, __LINE__,
                             events, revents, fd, resp->cgi.to_script, resp->cgi.from_script, resp->id);
             if ((resp->send_ready & FRAME_HEADERS_READY) || (resp->send_ready & FRAME_DATA_READY))
             {
-                return; 
+                return;
             }
 
             if (resp->cgi.cgi_type <= PHPCGI)
