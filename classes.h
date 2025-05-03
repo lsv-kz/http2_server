@@ -27,7 +27,7 @@ enum HTTP2_FLAGS { FLAG_ACK = 0x1, FLAG_END_STREAM = 0x1, FLAG_END_HEADERS = 0x4
 
 enum  CONTENT_TYPE { ERROR_TYPE, DIRECTORY = 1, REGFILE, DYN_PAGE, };
 
-enum CGI_OPERATION { CGI_STDIN, CGI_STDOUT, };
+enum CGI_OPERATION { CGI_CREATE, CGI_STDIN, CGI_STDOUT, };
 enum SCGI_OPERATION { SCGI_PARAMS, SCGI_STDIN, SCGI_STDOUT };
 enum FCGI_OPERATION { FASTCGI_BEGIN, FASTCGI_PARAMS, FASTCGI_STDIN, FASTCGI_STDOUT };
 
@@ -168,6 +168,7 @@ struct Response
         CGI_TYPE cgi_type;
         CGI_OPERATION op;
         bool end_post_data;
+        bool start;
         bool cgi_end;
         time_t timer;
 
@@ -176,6 +177,7 @@ struct Response
         std::string query_string;
         pid_t pid;
 
+        int num_poll;
         // CGI, PHPCGI
         int to_script;
         int from_script;
@@ -214,7 +216,7 @@ struct Response
         file_size = 0;
         send_cont_length = post_cont_length = 0;
 
-        cgi.cgi_end = cgi.end_post_data = false;
+        cgi.start = cgi.cgi_end = cgi.end_post_data = false;
         cgi.fd = cgi.to_script = cgi.from_script = -1;
         cgi.fcgi_type = 0;
         cgi.fcgiContentLen = cgi.fcgiPaddingLen = 0;

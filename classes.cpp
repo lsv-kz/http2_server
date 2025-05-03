@@ -79,7 +79,7 @@ void http2::del_from_list(Response *r)
     --len_;
 }
 //------------------------------------------------------------------
-int http2::close_stream(http2 *h2, int id)
+int http2::close_stream(http2 *h2, int id, int *num_cgi)
 {
     Response *r = start, *next = NULL;
     for ( ; r; r = next)
@@ -89,6 +89,8 @@ int http2::close_stream(http2 *h2, int id)
         {
             if (r->content == DYN_PAGE)
             {
+                if (r->cgi.start)
+                    (*num_cgi)--;
                 if (r->cgi.cgi_type <= PHPCGI)
                 {
                     h2->num_cgi--;

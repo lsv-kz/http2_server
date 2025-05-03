@@ -69,7 +69,7 @@ enum {
     M_PATCH, M_DELETE, M_TRACE, M_CONNECT
 };
 
-enum OPERATION_HTTP2 { SSL_ACCEPT = 1, PREFACE_MESSAGE, SEND_SETTINGS, WORK_STREAM, SSL_SHUTDOWN, CLOSE_CONNECT, };
+enum OPERATION_HTTP2 { SSL_ACCEPT = 1, PREFACE_MESSAGE, SEND_SETTINGS, WORK_STREAM, SSL_SHUTDOWN, };
 
 enum IO_STATUS { WAIT = 1, WORK };
 enum DIRECT { TIME_OUT, FROM_CLIENT, TO_CLIENT };
@@ -133,6 +133,8 @@ public:
 
     int MaxAcceptConnections;
 
+    int MaxCgiProc;
+
     int Timeout;
     int TimeoutPoll;
     int TimeoutCGI;
@@ -157,7 +159,6 @@ public:
     ~Config()
     {
         free_fcgi_list();
-        //std::cout << __func__ << " ******* " << getpid() << " *******\n";
     }
 
     void free_fcgi_list()
@@ -219,7 +220,7 @@ struct http2
 
     Response *add();
     void del_from_list(Response *r);
-    int close_stream(http2 *h2, int id);
+    int close_stream(http2 *h2, int id, int *num_cgi);
     int set_window_size(unsigned long num_conn, int id, long n);
     Response *get(int id);
     Response *get();
@@ -263,7 +264,7 @@ struct http2
             next = r->next;
             delete r;
         }
-        print_err("<%s:%d> ~~~~ close connect\n", __func__, __LINE__);
+
         start = end = NULL;
     }
 private:
@@ -344,21 +345,27 @@ class EventHandlerClass
     int send_html(Connect *c);
     int set_pollfd_array(Connect *c, int i);
     int from_client(Connect *c);
-    int send_headers(Connect *c, Response *resp);
-    int send_response(Connect *c, Response *resp);
+    int send_headers(Connect *c, Response *r);
+    int send_response(Connect *c, Response *r);
 
     void cgi_worker(Connect* c, Response *resp);
 
     int send_window_update(Connect *c);
-    int send_window_update(Connect *c, Response *resp);
+    int send_window_update(Connect *c, Response *r);
 
-    int cgi_stdin(Connect *c, Response *resp, int fd);
-    int cgi_stdout(Connect *c, Response *resp, int fd);
+    int cgi_create_proc(Connect *c, Response *r);
+    int cgi_fork(Connect *c, Response *r, int* serv_cgi, int* cgi_serv);
+    int cgi_stdin(Connect *c, Response *r, int fd);
+    int cgi_stdout(Connect *c, Response *r, int fd);
     void cgi_worker(Connect *c, Response *r, struct pollfd *p);
 
     void scgi_worker(Connect* c, Response *r, struct pollfd *p);
     void fcgi_worker(Connect* c, Response *r, struct pollfd *p);
-    void fcgi_get_headers(Connect* con, Response *resp);
+    void fcgi_get_headers(Connect* con, Response *r);
+
+    void create_message(Response *r, int status);
+    
+    void close_stream(Connect *c, int id);
 
 public:
 
@@ -366,9 +373,12 @@ public:
     ~EventHandlerClass();
 
     void init(int n);
-
     int wait_conn();
+
     void add_work_list();
+
+    void close_connect(Connect *r);
+    void ssl_shutdown(Connect *r);
 
     int cgi_set_poll();
     int set_poll();
@@ -378,7 +388,6 @@ public:
     void push_pollin_list(Connect *c);
     void push_send_multipart(Connect *c);
     void push_send_html(Connect *c);
-    void push_ssl_shutdown(Connect *c);
     void close_event_handler();
 };
 //----------------------------------------------------------------------
@@ -462,7 +471,6 @@ void ssl_shutdown(Connect *c);
 void close_connect(Connect *c);
 //----------------------------------------------------------------------
 void push_pollin_list(Connect *c);
-void push_ssl_shutdown(Connect *c);
 void event_handler(int);
 void close_work_thread();
 //----------------------------------------------------------------------

@@ -37,7 +37,7 @@ void kill_chld(Response *r)
     }
 }
 //======================================================================
-int cgi_fork(Connect *con, Response *resp, int* serv_cgi, int* cgi_serv)
+int EventHandlerClass::cgi_fork(Connect *con, Response *resp, int* serv_cgi, int* cgi_serv)
 {
     struct stat st;
 
@@ -56,7 +56,7 @@ int cgi_fork(Connect *con, Response *resp, int* serv_cgi, int* cgi_serv)
     if (stat(resp->cgi.path.c_str(), &st) == -1)
     {
         print_err(con, "<%s:%d> script (%s) not found\n", __func__, __LINE__, resp->cgi.path.c_str());
-        resp_404(resp);
+        create_message(resp, 404);
         return 0;
     }
     //--------------------------- fork ---------------------------------
@@ -173,7 +173,7 @@ int cgi_fork(Connect *con, Response *resp, int* serv_cgi, int* cgi_serv)
     return 0;
 }
 //======================================================================
-int cgi_create_proc(Connect *con, Response *resp)
+int EventHandlerClass::cgi_create_proc(Connect *con, Response *resp)
 {
     int serv_cgi[2], cgi_serv[2];
 
@@ -271,11 +271,11 @@ int EventHandlerClass::cgi_stdin(Connect *con, Response *resp, int fd)
     {
         resp->post_data.offset_add(ret);
         resp->cgi.timer = 0;
-        resp->send_ready |= RECV_FROM_CLIENT_WAIT;
+        //resp->send_ready |= RECV_FROM_CLIENT_WAIT;
     }
     else
     {
-        resp->send_ready &= (~RECV_FROM_CLIENT_WAIT);
+        //resp->send_ready &= (~RECV_FROM_CLIENT_WAIT);
         resp->cgi.timer = 0;
         con->h2.server_window_size -= resp->post_data.size();
         resp->cgi.window_update -= resp->post_data.size();
@@ -383,7 +383,7 @@ void EventHandlerClass::cgi_worker(Connect *c, Response *resp, struct pollfd *po
             {
                 print_err(c, "<%s:%d> Error cgi.to_script=%d, fd=%d, id=%d\n", __func__, __LINE__,
                                         resp->cgi.to_script, fd, resp->id);
-                resp_500(resp);
+                create_message(resp, 500);
                 return;
             }
         }
@@ -400,7 +400,7 @@ void EventHandlerClass::cgi_worker(Connect *c, Response *resp, struct pollfd *po
             else if (ret < 0)
             {
                 print_err(c, "<%s:%d> Error cgi_stdin()=%d\n", __func__, __LINE__, ret);
-                resp_502(resp);
+                create_message(resp, 502);
                 return;
             }
             else
@@ -413,7 +413,7 @@ void EventHandlerClass::cgi_worker(Connect *c, Response *resp, struct pollfd *po
         {
             print_err(c, "<%s:%d> Error events/revents=0x%02X/0x%02X, fd=%d,   id=%d\n", __func__, __LINE__,
                     events, revents, fd, resp->id);
-            resp_502(resp);
+            create_message(resp, 502);
         }
     }
     else if (resp->cgi.op == CGI_STDOUT)
@@ -422,9 +422,9 @@ void EventHandlerClass::cgi_worker(Connect *c, Response *resp, struct pollfd *po
         {
             if (resp->cgi.from_script != fd)
             {
-                print_err(c, "<%s:%d> Error cgi.from_script=%d, fd=%d\n", __func__, __LINE__,
-                                        resp->cgi.from_script, fd);
-                resp_502(resp);
+                print_err(c, "<%s:%d> Error cgi.from_script=%d, fd=%d, 0x%02X,  id=%d\n", __func__, __LINE__,
+                                        resp->cgi.from_script, fd, revents, resp->id);
+                create_message(resp, 502);
                 return;
             }
         }
@@ -440,7 +440,7 @@ void EventHandlerClass::cgi_worker(Connect *c, Response *resp, struct pollfd *po
             {
                 print_err(c, "<%s:%d> Error cgi_stdout()=%d\n", __func__, __LINE__, ret);
                 send_rst_stream(c, resp->id);
-                c->h2.close_stream(&c->h2, resp->id);
+                c->h2.close_stream(&c->h2, resp->id, &num_cgi);
             }
             else if (ret == 0)
             {
@@ -488,10 +488,9 @@ void EventHandlerClass::cgi_worker(Connect *c, Response *resp, struct pollfd *po
                         if ((p3 = strstr_case(resp->html.ptr(), "Status:")))
                         {
                             sscanf(p3 + 7, "%d", &resp->status);
-
                             if (resp->status == 204)
                             {
-                                resp_204(resp);
+                                create_message(resp, 204);
                                 resp->send_cont_length = 0;
                                 set_frame_data(resp, 0, FLAG_END_STREAM);
 
@@ -554,8 +553,6 @@ void EventHandlerClass::cgi_worker(Connect *c, Response *resp, struct pollfd *po
         }
         else if (revents)
         {
-            print_err(c, "<%s:%d> events/revents=0x%02X/0x%02X, fd=%d, to=%d, from=%d,   id=%d\n", __func__, __LINE__,
-                            events, revents, fd, resp->cgi.to_script, resp->cgi.from_script, resp->id);
             if ((resp->send_ready & FRAME_HEADERS_READY) || (resp->send_ready & FRAME_DATA_READY))
             {
                 return;
@@ -579,7 +576,7 @@ void EventHandlerClass::cgi_worker(Connect *c, Response *resp, struct pollfd *po
                 }
                 else
                 {
-                    resp_500(resp);
+                    create_message(resp, 500);
                 }
             }
 

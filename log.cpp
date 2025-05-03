@@ -109,7 +109,6 @@ void print_log(Connect *r, Response *resp)
     String ss(320);
     if (resp)
     {
-//print_err(r, "<%s:%d>...  send %lld bytes ... id=%d\n", __func__, __LINE__, resp->send_bytes, resp->id);
         ss  << r->numConn << "/" << resp->id << " - " << r->remoteAddr << " - [" << log_time()
             << "] - \"" << resp->method.c_str() << " " << resp->decode_path.c_str() << " HTTP/2\" - "
             << resp->status << " " << resp->send_bytes << " - \"" << resp->user_agent << "\" - id=" << resp->id << "\n";
@@ -123,7 +122,7 @@ void print_log(Connect *r, Response *resp)
 mtxLog.lock();
     write(flog, ss.c_str(), ss.size());
     num_log_records++;
-    if (num_log_records > 100000) // 100000 ~ 9,5 Mb
+    if (num_log_records > 100000)
     {
         exit(1);
         close(flog);

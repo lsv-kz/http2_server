@@ -295,7 +295,7 @@ void EventHandlerClass::fcgi_worker(Connect* con, Response *resp, struct pollfd 
                     con->io_status = WAIT;
                 else
                 {
-                    resp_502(resp);
+                    create_message(resp, 502);
                 }
 
                 return;
@@ -309,10 +309,10 @@ void EventHandlerClass::fcgi_worker(Connect* con, Response *resp, struct pollfd 
                 resp->cgi.fcgi_op = FASTCGI_PARAMS;
             }
         }
-        else
+        else if (revents != 0)
         {
             print_err(con, "<%s:%d> Error 0x%02X(0x%02X), fd=%d\n", __func__, __LINE__, poll_fd->revents, poll_fd->events, poll_fd->fd);
-            resp_502(resp);
+            create_message(resp, 502);
         }
     }
     else if (resp->cgi.fcgi_op == FASTCGI_PARAMS)
@@ -331,7 +331,7 @@ void EventHandlerClass::fcgi_worker(Connect* con, Response *resp, struct pollfd 
                     con->io_status = WAIT;
                 else
                 {
-                    resp_502(resp);
+                    create_message(resp, 502);
                 }
 
                 return;
@@ -356,11 +356,19 @@ void EventHandlerClass::fcgi_worker(Connect* con, Response *resp, struct pollfd 
         }
         else
         {
-            resp_502(resp);
+            print_err(con, "<%s:%d> FASTCGI_PARAMS Error revents=0x%02X: %s; id=%d\n", __func__, __LINE__, revents, resp->id);
+            create_message(resp, 502);
         }
     }
     else if (resp->cgi.fcgi_op == FASTCGI_STDIN)
     {
+        if (revents != POLLOUT)
+        {
+            print_err(con, "<%s:%d> FASTCGI_STDIN Error revents=0x%02X: %s; id=%d\n", __func__, __LINE__, revents, resp->id);
+            create_message(resp, 502);
+            return;
+        }
+
         int ret = write(fd, resp->post_data.ptr_remain(), resp->post_data.size_remain());
         if (ret <= 0)
         {
@@ -368,7 +376,7 @@ void EventHandlerClass::fcgi_worker(Connect* con, Response *resp, struct pollfd 
             {
                 print_err(con, "<%s:%d> Error write()=%d: %s; id=%d\n", __func__, __LINE__, ret, strerror(errno), resp->id);
                 resp->post_data.init();
-                resp_502(resp);
+                create_message(resp, 502);
             }
             return;
         }
@@ -402,6 +410,13 @@ void EventHandlerClass::fcgi_worker(Connect* con, Response *resp, struct pollfd 
     }
     else if (resp->cgi.fcgi_op == FASTCGI_STDOUT)
     {
+        if (revents != POLLIN)
+        {
+            print_err(con, "<%s:%d> FASTCGI_STDOUT Error revents=0x%02X: %s; id=%d\n", __func__, __LINE__, revents, resp->id);
+            create_message(resp, 502);
+            return;
+        }
+
         if (resp->cgi.fcgiContentLen == 0)
         {
             if (resp->cgi.fcgiPaddingLen > 0)
@@ -411,7 +426,7 @@ void EventHandlerClass::fcgi_worker(Connect* con, Response *resp, struct pollfd 
                 if (ret <= 0)
                 {
                     resp->post_data.init();
-                    resp_502(resp);
+                    create_message(resp, 502);
                     return;
                 }
 
@@ -426,7 +441,7 @@ void EventHandlerClass::fcgi_worker(Connect* con, Response *resp, struct pollfd 
             {
                 if ((ret == -1) && (errno == EAGAIN))
                     return;
-                resp_502(resp);
+                create_message(resp, 502);
                 return;
             }
 
@@ -443,7 +458,7 @@ void EventHandlerClass::fcgi_worker(Connect* con, Response *resp, struct pollfd 
                 case FCGI_END_REQUEST:
                     break;
                 default:
-                    resp_502(resp);
+                    create_message(resp, 502);
             }
 
             return;
@@ -539,7 +554,6 @@ void EventHandlerClass::fcgi_get_headers(Connect* con, Response *resp)
             add_header(resp, 31, cont_type);
             resp->create_headers = true;
             resp->html.offset_add(p - resp->html.ptr());
-
             if (resp->html.size() > resp->html.get_offset())
             {
                 int offs = resp->html.get_offset();

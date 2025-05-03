@@ -34,7 +34,7 @@ unique_lock<mutex> lk(mtx_conn);
     return close_server;
 }
 //======================================================================
-void close_connect(Connect *r)
+void EventHandlerClass::close_connect(Connect *r)
 {
     if (r->tls.ssl)
     {
@@ -49,6 +49,7 @@ void close_connect(Connect *r)
         print_err(r, "<%s:%d> Error close(): %s\n", __func__, __LINE__, strerror(errno));
     }
 
+    del_from_list(r);
     delete r;
 
 mtx_conn.lock();
@@ -57,52 +58,49 @@ mtx_conn.unlock();
     cond_close_conn.notify_all();
 }
 //======================================================================
-void ssl_shutdown(Connect *r)
+void EventHandlerClass::ssl_shutdown(Connect *conn)
 {
-    if (r->tls.ssl)
+    if (conn->tls.ssl)
     {
-        if ((r->tls.err != SSL_ERROR_SSL) &&
-            (r->tls.err != SSL_ERROR_SYSCALL))
+        if ((conn->tls.err != SSL_ERROR_SSL) && 
+            (conn->tls.err != SSL_ERROR_SYSCALL))
         {
-            int ret = SSL_shutdown(r->tls.ssl);
+            conn->h2.type_op = SSL_SHUTDOWN;
+            int ret = SSL_shutdown(conn->tls.ssl);
             if (ret == -1)
             {
-                r->tls.err = SSL_get_error(r->tls.ssl, ret);
-                print_err(r, "<%s:%d> Error SSL_shutdown()=%d, err=%s\n", __func__, __LINE__, ret, ssl_strerror(r->tls.err));
-                if (r->tls.err == SSL_ERROR_ZERO_RETURN)
+                conn->tls.err = SSL_get_error(conn->tls.ssl, ret);
+                if (conn->tls.err == SSL_ERROR_ZERO_RETURN)
                 {
-                    close_connect(r);
+                    close_connect(conn);
                     return;
                 }
-                else if (r->tls.err == SSL_ERROR_WANT_READ)
+                else if (conn->tls.err == SSL_ERROR_WANT_READ)
                 {
-                    r->io_status = WAIT;
-                    r->tls.poll_event = POLLIN;
-                    push_ssl_shutdown(r);
+                    conn->io_status = WAIT;
+                    conn->tls.poll_event = POLLIN;
                     return;
                 }
-                else if (r->tls.err == SSL_ERROR_WANT_WRITE)
+                else if (conn->tls.err == SSL_ERROR_WANT_WRITE)
                 {
-                    r->io_status = WAIT;
-                    r->tls.poll_event = POLLOUT;
-                    push_ssl_shutdown(r);
+                    conn->io_status = WAIT;
+                    conn->tls.poll_event = POLLOUT;
                     return;
                 }
             }
             else if (ret == 0)
             {
-                r->io_status = WORK;
-                push_ssl_shutdown(r);
+                conn->io_status = WORK;
                 return;
             }
         }
         else
         {
-            print_err(r, "<%s:%d> tls.err: %s\n", __func__, __LINE__, ssl_strerror(r->tls.err));
+            print_err(conn, "<%s:%d> tls.err: %s\n", __func__, __LINE__, ssl_strerror(conn->tls.err));
         }
     }
-print_err(r, "<%s:%d> SSL shutdown\n", __func__, __LINE__);
-    close_connect(r);
+
+    close_connect(conn);
 }
 //======================================================================
 Connect *create_req();
@@ -150,9 +148,8 @@ void manager(int sockServer)
         if (ret_sel <= 0)
         {
             print_err("<%s:%d> Error select()=%d: %s\n", __func__, __LINE__, ret_sel, strerror(errno));
-            fprintf(stderr, "<%s:%d> Error select()=%d: %s\n", __func__, __LINE__, ret_sel, strerror(errno));
-            //if (errno == EINTR)
-            //    continue;
+            if (errno == EINTR)
+                continue;
             break;
         }
 
@@ -177,6 +174,13 @@ void manager(int sockServer)
         }
 
         int flags = 1;
+        if (ioctl(clientSocket, FIONBIO, &flags) == -1)
+        {
+            print_err("<%s:%d> Error ioctl(FIONBIO, 1): %s\n", __func__, __LINE__, strerror(errno));
+            break;
+        }
+
+        flags = 1;
         flags = fcntl(clientSocket, F_GETFD);
         if (flags == -1)
         {

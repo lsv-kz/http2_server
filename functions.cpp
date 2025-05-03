@@ -160,8 +160,6 @@ const char *get_str_operation(OPERATION_HTTP2 n)
             return "WORK_STREAM";
         case SSL_SHUTDOWN:
             return "SSL_SHUTDOWN";
-        case CLOSE_CONNECT:
-            return "CLOSE_CONNECT";
     }
 
     return "?";
@@ -808,80 +806,14 @@ int set_response(Connect *con, Response *resp)
     else if (resp->content == DYN_PAGE)
     {
         resp->data.init();
-        //--------------------------------------------------------------
-        if ((resp->cgi.cgi_type == CGI) || (resp->cgi.cgi_type == PHPCGI))
-        {
-            if (cgi_create_proc(con, resp) < 0)
-            {
-                print_err(con, "<%s:%d> Error cgi_create_proc()\n", __func__, __LINE__);
-                con->err = -1;
-                return -1;
-            }
-
-            print_err(con, "<%s:%d> to_script=%d, from_script=%d,  id=%d\n", __func__, __LINE__, resp->cgi.to_script, resp->cgi.from_script, resp->id);
-
-            if (resp->method == "POST")
-            {
-                if(resp->post_cont_length <= 0)
-                {
-                    resp->cgi.op = CGI_STDOUT;
-                    close(resp->cgi.to_script);
-                    resp->cgi.to_script = -1;
-                }
-                else
-                {
-                    resp->cgi.op = CGI_STDIN;
-                }
-            }
-            else
-            {
-                resp->cgi.op = CGI_STDOUT;
-            }
-        }
-        else if (resp->cgi.cgi_type == PHPFPM)
-        {
-            int ret = fcgi_create_connect(con, resp);
-            if (ret < 0)
-            {
-                resp_500(resp);
-            }
-            else
-            {
-                resp->cgi.fcgi_op = FASTCGI_BEGIN;
-                resp->cgi.op = CGI_STDIN;
-            }
-        }
+        resp->cgi.op = CGI_CREATE;
     }
     else
     {
         if (iscgi(con, resp))
         {
-            if (resp->cgi.cgi_type == SCGI)
-            {
-                int ret = scgi_create_connect(con, resp);
-                if (ret < 0)
-                {
-                    resp_500(resp);
-                }
-                else
-                {
-                    resp->cgi.scgi_op = SCGI_PARAMS;
-                    resp->cgi.op = CGI_STDIN;
-                }
-            }
-            else if (resp->cgi.cgi_type == FASTCGI)
-            {
-                int ret = fcgi_create_connect(con, resp);
-                if (ret < 0)
-                {
-                    resp_500(resp);
-                }
-                else
-                {
-                    resp->cgi.fcgi_op = FASTCGI_BEGIN;
-                    resp->cgi.op = CGI_STDIN;
-                }
-            }
+            resp->data.init();
+            resp->cgi.op = CGI_CREATE;
         }
         else
         {

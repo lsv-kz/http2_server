@@ -63,6 +63,8 @@ void create_conf_file(const char *path)
 
     fprintf(f, "DataBufSize          16384\n\n");
 
+    fprintf(f, "MaxCgiProc           15\n\n");
+
     fprintf(f, "Timeout              120 # seconds\n");
     fprintf(f, "TimeoutCGI           15  # seconds\n");
     fprintf(f, "TimeoutPoll          100 # milliseconds\n\n");
@@ -282,6 +284,8 @@ int read_conf_file(FILE *fconf)
                 s2 >> c.LogPath;
             else if (s1 == "PidFilePath")
                 s2 >> c.PidFilePath;
+            else if ((s1 == "MaxCgiProc") && is_number(s2.c_str()))
+                s2 >> c.MaxCgiProc;
             else if ((s1 == "Timeout") && is_number(s2.c_str()))
                 s2 >> c.Timeout;
             else if ((s1 == "TimeoutCGI") && is_number(s2.c_str()))
@@ -405,6 +409,12 @@ int read_conf_file(FILE *fconf)
         exit(1);
     }
     //------------------------------------------------------------------
+    if (conf->MaxCgiProc == 0)
+    {
+        fprintf(stderr, "<%s:%d> Error: MaxCgiProc=0\n", __func__, __LINE__);
+        return -1;
+    }
+    //------------------------------------------------------------------
     if (conf->MaxAcceptConnections <= 0)
     {
         fprintf(stderr, "<%s:%d> Error config file: MaxAcceptConnections=%d\n", __func__, __LINE__, conf->MaxAcceptConnections);
@@ -413,7 +423,7 @@ int read_conf_file(FILE *fconf)
 
     const int fd_stdio = 3, fd_logs = 2, fd_sock = 1, fd_pipe = 2;
     long min_open_fd = fd_stdio + fd_logs + fd_sock + fd_pipe;
-    int max_fd = min_open_fd + conf->MaxAcceptConnections * 2 + 100 * 2;
+    int max_fd = min_open_fd + conf->MaxAcceptConnections * 2 + conf->MaxCgiProc * 2;
     n = set_max_fd(max_fd);
     if (n == -1)
         return -1;

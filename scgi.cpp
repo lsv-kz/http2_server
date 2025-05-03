@@ -277,7 +277,7 @@ void EventHandlerClass::scgi_worker(Connect* con, Response *resp, struct pollfd 
                     con->io_status = WAIT;
                 else
                 {
-                    resp_502(resp);
+                    create_message(resp, 502);
                 }
 
                 return;
@@ -311,7 +311,7 @@ void EventHandlerClass::scgi_worker(Connect* con, Response *resp, struct pollfd 
         else
         {
             print_err("<%s:%d> Error 0x%02X(0x%02X), fd=%d\n", __func__, __LINE__, poll_fd->revents, poll_fd->events, poll_fd->fd);
-            resp_502(resp);
+            create_message(resp, 502);
         }
     }
 }

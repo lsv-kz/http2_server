@@ -120,20 +120,11 @@ int create_fcgi_socket(Connect *con, Response *resp)
             return -1;
         }
 
-        int flags = fcntl(sockfd, F_GETFL);
-        if (flags == -1)
+        int flags = 1;
+        if (ioctl(sockfd, FIONBIO, &flags) == -1)
         {
-            print_err(con, "<%s:%d> Error fcntl(, F_GETFL, ): %s\n", __func__, __LINE__, strerror(errno));
+            print_err(con, "<%s:%d> Error ioctl(FIONBIO, 1): %s\n", __func__, __LINE__, strerror(errno));
             return -1;
-        }
-        else
-        {
-            flags |= O_NONBLOCK;
-            if (fcntl(sockfd, F_SETFL, flags) == -1)
-            {
-                print_err(con, "<%s:%d> Error fcntl(, F_SETFL, ): %s\n", __func__, __LINE__, strerror(errno));
-                return -1;
-            }
         }
 
         if (connect(sockfd, (struct sockaddr *)(&sock_addr), sizeof(sock_addr)) != 0)

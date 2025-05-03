@@ -169,15 +169,11 @@ int ssl_read(Connect *con, char *buf, int len)
     }
     else
     {
-        int pend = SSL_pending(con->tls.ssl);
+        /*int pend = SSL_pending(con->tls.ssl);
         if (pend)
-        {
-            //if (conf->PrintDebugMsg == 'y')
-            //    print_err(con, "<%s:%d> SSL_pending()=%d\n", __func__, __LINE__, pend);
             con->io_status = WORK;
-        }
         else
-            con->io_status = WAIT;
+            con->io_status = WAIT;*/
 
         return ret;
     }
