@@ -231,13 +231,25 @@ struct Response
             print_err("<%s:%d> !!! ~Resp(%s), send_bytes != file_size, id=%d\n", __func__, __LINE__, uri, id);
 
         if (fd > 0)
+        {
             close(fd);
+            fd = -1;
+        }
         if (cgi.fd > 0)
+        {
             close(cgi.fd);
+            cgi.fd = 1;
+        }
         if (cgi.to_script > 0)
+        {
             close(cgi.to_script);
+            cgi.to_script = -1;
+        }
         if (cgi.from_script > 0)
+        {
             close(cgi.from_script);
+            cgi.from_script = -1;
+        }
     }
 
 private:

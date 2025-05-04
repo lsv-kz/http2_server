@@ -96,11 +96,6 @@ int http2::close_stream(http2 *h2, int id, int *num_cgi)
                     h2->num_cgi--;
                     kill_chld(r);
                 }
-                else
-                {
-                    if (r->cgi.fd > 0)
-                        close(r->cgi.fd);
-                }
             }
 
             del_from_list(r);
