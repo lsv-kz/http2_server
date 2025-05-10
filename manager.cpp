@@ -40,8 +40,6 @@ void EventHandlerClass::close_connect(Connect *r)
     {
         SSL_free(r->tls.ssl);
     }
-    else
-        print_err(r, "<%s:%d> !!!!! close connect: tls.ssl=NULL\n", __func__, __LINE__);
 
     shutdown(r->clientSocket, SHUT_RDWR);
     if (close(r->clientSocket))
@@ -173,10 +171,12 @@ void manager(int sockServer)
             continue;
         }
 
+        req->h2.numConn = req->numConn;
+
         int flags = 1;
         if (ioctl(clientSocket, FIONBIO, &flags) == -1)
         {
-            print_err("<%s:%d> Error ioctl(FIONBIO, 1): %s\n", __func__, __LINE__, strerror(errno));
+            print_err("<%s:%d> Error ioctl(, FIONBIO, 1): %s\n", __func__, __LINE__, strerror(errno));
             break;
         }
 
@@ -184,14 +184,14 @@ void manager(int sockServer)
         flags = fcntl(clientSocket, F_GETFD);
         if (flags == -1)
         {
-            print_err("<%s:%d> Error fcntl(F_GETFD): %s\n", __func__, __LINE__, strerror(errno));
+            print_err("<%s:%d> Error fcntl(, F_GETFD): %s\n", __func__, __LINE__, strerror(errno));
             break;
         }
 
         flags |= FD_CLOEXEC;
         if (fcntl(clientSocket, F_SETFD, flags) == -1)
         {
-            print_err("<%s:%d> Error fcntl(F_SETFD, FD_CLOEXEC): %s\n", __func__, __LINE__, strerror(errno));
+            print_err("<%s:%d> Error fcntl(, F_SETFD, FD_CLOEXEC): %s\n", __func__, __LINE__, strerror(errno));
             break;
         }
 
@@ -252,6 +252,8 @@ void manager(int sockServer)
                     __func__, __LINE__, allConn, num_conn);
 
     usleep(100000);
+    print_err("<%s:%d> ***** Exit *****\n", __func__, __LINE__);
+    exit(0);
 }
 //======================================================================
 Connect *create_req(void)

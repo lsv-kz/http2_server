@@ -559,6 +559,8 @@ int set_max_fd(int max_open_fd)
                 fprintf(stderr, "<%s:%d> Error sysconf(_SC_OPEN_MAX): %s\n", __func__, __LINE__, strerror(errno));
                 return -1;
             }
+            else
+                fprintf(stdout, "<%s:%d> sysconf(_SC_OPEN_MAX): %d\n", __func__, __LINE__, max_open_fd);
         }
     }
 

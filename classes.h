@@ -228,7 +228,7 @@ struct Response
     ~Response()
     {
         if ((send_bytes != file_size) && (content == REGFILE))
-            print_err("<%s:%d> !!! ~Resp(%s), send_bytes != file_size, id=%d\n", __func__, __LINE__, uri, id);
+            print_err("<%s:%d> !!! ~Resp(%s), send_bytes != file_size, window_update=%ld, id=%d\n", __func__, __LINE__, uri, window_update, id);
 
         if (fd > 0)
         {

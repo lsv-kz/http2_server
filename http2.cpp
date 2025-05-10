@@ -33,6 +33,7 @@ int EventHandlerClass::http2_worker_connections(Connect *con)
                 return 0;
             }
 
+            print_err(con, "<%s:%d> Error read_from_client()=%d\n", __func__, __LINE__, ret);
             ssl_shutdown(con);
             return -1;
         }
@@ -40,7 +41,7 @@ int EventHandlerClass::http2_worker_connections(Connect *con)
     }
     else if (con->h2.type_op == SEND_SETTINGS)
     {
-        int ret = write_to_client(con, con->h2.settings.ptr_remain(), con->h2.settings.size_remain());
+        int ret = write_to_client(con, con->h2.settings.ptr_remain(), con->h2.settings.size_remain(), 0);
         if (ret <= 0)
         {
             print_err(con, "<%s:%d> Error send frame SETTINGS\n", __func__, __LINE__);
@@ -101,6 +102,7 @@ int EventHandlerClass::http2_worker_connections(Connect *con)
                 }
             }
 
+            print_err(con, "<%s:%d> Error: no protocol has been selected\n", __func__, __LINE__);
             close_connect(con);
             return -1;
         }
@@ -190,8 +192,11 @@ int EventHandlerClass::http2_worker_streams(Connect *con)
 
         if (resp->send_ready & FRAME_HEADERS_READY)
         {
-            if (send_headers(con, resp) < 0)
+            int ret = send_headers(con, resp);
+            if (ret < 0)
             {
+                if (ret == ERR_TRY_AGAIN)
+                    return ERR_TRY_AGAIN;
                 ssl_shutdown(con);
                 return -1;
             }
@@ -202,6 +207,12 @@ int EventHandlerClass::http2_worker_streams(Connect *con)
             int ret = send_response(con, resp);
             if (ret < 0)
             {
+                if (ret == ERR_TRY_AGAIN)
+                {
+                    print_err(con, "<%s:%d> Error send frame DATA: %d, %d, id=%d\n", __func__, __LINE__,
+                                                ret, resp->data.size(), resp->id);
+                    return ERR_TRY_AGAIN;
+                }
                 ssl_shutdown(con);
                 return -1;
             }
@@ -228,13 +239,11 @@ int EventHandlerClass::send_window_update(Connect *con)
               (unsigned char)con->h2.frame_win_update.get_byte(12);
 
     int ret = 0;
-    if ((ret = write_to_client(con, con->h2.frame_win_update.ptr(), con->h2.frame_win_update.size())) <= 0)
+    if ((ret = write_to_client(con, con->h2.frame_win_update.ptr(), con->h2.frame_win_update.size(), 0)) <= 0)
     {
         print_err(con, "<%s:%d> Error send frame WINDOW_UPDATE: %d, %d, id=0\n", __func__, __LINE__, ret, con->h2.frame_win_update.size());
         if (ret == ERR_TRY_AGAIN)
             return 0;
-
-        con->err = -1;
         return -1;
     }
 
@@ -259,13 +268,12 @@ int EventHandlerClass::send_window_update(Connect *con, Response *resp)
               (unsigned char)resp->frame_win_update.get_byte(12);
 
     int ret = 0;
-    if ((ret = write_to_client(con, resp->frame_win_update.ptr(), resp->frame_win_update.size())) <= 0)
+    if ((ret = write_to_client(con, resp->frame_win_update.ptr(), resp->frame_win_update.size(), resp->id)) <= 0)
     {
         print_err(con, "<%s:%d> Error send frame WINDOW_UPDATE: %d, %d, id=%d\n", __func__, __LINE__, ret, resp->frame_win_update.size(), resp->id);
         if (ret == ERR_TRY_AGAIN)
             return 0;
         close_stream(con, resp->id);
-        con->err = -1;
         return -1;
     }
 
@@ -297,7 +305,6 @@ int EventHandlerClass::from_client(Connect *con)
         else
         {
             print_err(con, "<%s:%d> Error read_from_client\n", __func__, __LINE__);
-            con->err = -1;
             return -1;
         }
     }
@@ -329,8 +336,7 @@ int EventHandlerClass::from_client(Connect *con)
                     send_rst_stream(con, con->h2.id);
                     return 0;
                 }
-                print_err(con, "<%s:%d> Error read frame body: %d\n", __func__, __LINE__, read_body);
-                con->err = -1;
+
                 return -1;
             }
 
@@ -473,10 +479,9 @@ int EventHandlerClass::from_client(Connect *con)
         {
             con->h2.frame.cpy("\x0\x0\x8\x6\x1\x0\x0\x0\x0", 9);
             con->h2.frame.cat(buf, 8);
-            if (write_to_client(con, con->h2.frame.ptr(), con->h2.frame.size()) <= 0)
+            if (write_to_client(con, con->h2.frame.ptr(), con->h2.frame.size(), 0) <= 0)
             {
                 print_err(con, "<%s:%d> Error send frame %s,   id=%d\n", __func__, __LINE__, get_str_frame_type(con->h2.type), con->h2.id);
-                con->err = -1;
                 return -1;
             }
 
@@ -521,7 +526,6 @@ int EventHandlerClass::from_client(Connect *con)
     else
     {
         print_err(con, "<%s:%d> Error read frame header\n", __func__, __LINE__);
-        con->err = -1;
         return -1;
     }
     return 0;
@@ -531,7 +535,7 @@ int EventHandlerClass::send_headers(Connect *con, Response *resp)
 {
     if (resp->headers.size() && (!resp->send_headers))
     {
-        int ret = write_to_client(con, resp->headers.ptr(), resp->headers.size());
+        int ret = write_to_client(con, resp->headers.ptr(), resp->headers.size(), resp->id);
         if (ret <= 0)
         {
             print_err(con, "<%s:%d> Error send frame HEADERS: %d, id=%d\n", __func__, __LINE__, ret, resp->id);
@@ -587,14 +591,14 @@ int EventHandlerClass::send_response(Connect *con, Response *resp)
         }
     }
 
-    int ret = write_to_client(con, resp->data.ptr(), resp->data.size());
+    int ret = write_to_client(con, resp->data.ptr(), resp->data.size(), resp->id);
     if (ret <= 0)
     {
         if (ret == ERR_TRY_AGAIN)
         {
             print_err(con, "<%s:%d> Error send frame DATA: %d, %d, id=%d\n", __func__, __LINE__,
                                                 ret, resp->data.size(), resp->id);
-            return 0;
+            return ERR_TRY_AGAIN;
         }
 
         print_err(con, "<%s:%d> Error send frame DATA: %d, %d, id=%d\n", __func__, __LINE__,

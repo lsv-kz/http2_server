@@ -210,9 +210,9 @@ int create_fcgi_socket(Connect *con, Response *resp)
     return sockfd;
 }
 //======================================================================
-int write_to_client(Connect *req, const char *buf, int len)
+int write_to_client(Connect *req, const char *buf, int len, int id)
 {
-    return ssl_write(req, buf, len);
+    return ssl_write(req, buf, len, id);
 }
 //======================================================================
 int read_from_client(Connect *req, char *buf, int len)

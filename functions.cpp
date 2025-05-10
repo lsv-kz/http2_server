@@ -521,10 +521,9 @@ int send_rst_stream(Connect *c, int id)
     c->h2.frame.set_byte((id>>8) & 0xff, 7);
     c->h2.frame.set_byte(id & 0xff, 8);
 
-    if (write_to_client(c, c->h2.frame.ptr(), c->h2.frame.size()) <= 0)
+    if (write_to_client(c, c->h2.frame.ptr(), c->h2.frame.size(), id) <= 0)
     {
         print_err(c, "<%s:%d> Error send frame RST_STREAM\n", __func__, __LINE__);
-        c->err = -1;
         return -1;
     }
 
@@ -610,7 +609,6 @@ int set_frame_data(Connect *con, Response *resp)
                 print_err(con, "<%s:%d> Error read(fd=%d)=%d: %s, id=%d\n", __func__, __LINE__, resp->fd, n, strerror(errno), resp->id);
                 close(resp->fd);
                 resp->fd = -1;
-                con->err = -1;
                 return -1;
             }
 
@@ -644,7 +642,6 @@ int set_frame_data(Connect *con, Response *resp)
             if ((resp->html.get_offset() + data_len) > resp->html.size())
             {
                 print_err(con, "<%s:%d> Error\n", __func__, __LINE__);
-                con->err = -1;
                 return -1;
             }
 
@@ -735,6 +732,7 @@ int set_response(Connect *con, Response *resp)
             add_header(resp, 10);
         else
             add_header(resp, 8);
+        add_header(resp, 33, get_time().c_str());
         const char  *cont_type = content_type(resp->path.c_str());
         if (cont_type)
             add_header(resp, 31, cont_type);
@@ -742,6 +740,7 @@ int set_response(Connect *con, Response *resp)
         char s[128];
         snprintf(s, sizeof(s), "%lld", resp->send_cont_length);
         add_header(resp, 28, s);
+        add_header(resp, 18, "bytes");
 
         if (resp->file_size == 0)
         {
@@ -779,6 +778,7 @@ int set_response(Connect *con, Response *resp)
         {
             set_frame_headers(resp);
             add_header(resp, 8, "301");
+            add_header(resp, 33, get_time().c_str());
             add_header(resp, 46, resp->path.append("/").c_str());
             add_header(resp, 31, "text/plain");
             resp->create_headers = true;
@@ -786,7 +786,12 @@ int set_response(Connect *con, Response *resp)
             ByteArray smg;
             smg.cpy_str("301 Moved Permanently\n");
             smg.cat(resp->path.c_str(), resp->path.size());
-            resp->send_cont_length = 0;
+
+            resp->send_cont_length = smg.size();
+            char s[128];
+            snprintf(s, sizeof(s), "%lld", resp->send_cont_length);
+            add_header(resp, 28, s);
+
             set_frame_data(resp, smg.size(), FLAG_END_STREAM);
             resp->data.cat(smg.ptr(), smg.size());
             return 0;
@@ -801,6 +806,7 @@ int set_response(Connect *con, Response *resp)
         //------------- headers frame --------------
         set_frame_headers(resp);
         add_header(resp, 8);
+        add_header(resp, 33, get_time().c_str());
         resp->create_headers = true;
     }
     else if (resp->content == DYN_PAGE)
@@ -862,6 +868,13 @@ int parse_range(const char *s, long long file_size, long long *offset, long long
             return -1;
         if (strlen(p + 1) == 0)
             *content_length = file_size - *offset;
+        else
+		{
+			long long end = 0;
+			if (sscanf(p + 1, "%lld", &end) != 1)
+				return -1;
+			*content_length = end + 1 - *offset;
+		}
     }
     return 0;
 }
@@ -873,6 +886,7 @@ void resp_200(Response *resp)
     {
         set_frame_headers(resp);
         add_header(resp, 8);
+        add_header(resp, 33, get_time().c_str());
         add_header(resp, 31, "text/plain");
         resp->create_headers = true;
     }
@@ -889,6 +903,7 @@ void resp_204(Response *resp)
     resp->content = ERROR_TYPE;
     set_frame_headers(resp);
     add_header(resp, 8, "204");
+    add_header(resp, 33, get_time().c_str());
     add_header(resp, 28, "0");
     resp->create_headers = true;
 
@@ -903,6 +918,7 @@ void resp_400(Response *resp)
     {
         set_frame_headers(resp);
         add_header(resp, 12);
+        add_header(resp, 33, get_time().c_str());
         add_header(resp, 31, "text/plain");
         resp->create_headers = true;
     }
@@ -921,6 +937,7 @@ void resp_403(Response *resp)
     {
         set_frame_headers(resp);
         add_header(resp, 8, "403");
+        add_header(resp, 33, get_time().c_str());
         add_header(resp, 31, "text/plain");
         resp->create_headers = true;
     }
@@ -939,6 +956,7 @@ void resp_404(Response *resp)
     {
         set_frame_headers(resp);
         add_header(resp, 13);
+        add_header(resp, 33, get_time().c_str());
         add_header(resp, 31, "text/plain");
         resp->create_headers = true;
     }
@@ -957,6 +975,7 @@ void resp_500(Response *resp)
     {
         set_frame_headers(resp);
         add_header(resp, 14);
+        add_header(resp, 33, get_time().c_str());
         add_header(resp, 31, "text/plain");
         resp->create_headers = true;
     }
@@ -975,6 +994,7 @@ void resp_502(Response *resp)
     {
         set_frame_headers(resp);
         add_header(resp, 8, "502");
+        add_header(resp, 33, get_time().c_str());
         add_header(resp, 31, "text/plain");
         resp->create_headers = true;
     }
@@ -993,6 +1013,7 @@ void resp_504(Response *resp)
     {
         set_frame_headers(resp);
         add_header(resp, 8, "504");
+        add_header(resp, 33, get_time().c_str());
         add_header(resp, 31, "text/plain");
         resp->create_headers = true;
     }

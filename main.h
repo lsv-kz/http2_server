@@ -181,6 +181,8 @@ struct http2
     Response *start;
     Response *end;
 
+    unsigned long numConn;
+
     long init_window_size;
     long max_frame_size;
     OPERATION_HTTP2 type_op;
@@ -296,7 +298,6 @@ public:
 
     unsigned long numConn;
     int    clientSocket;
-    int    err;
     time_t sock_timer;
 
     IO_STATUS io_status;
@@ -415,7 +416,7 @@ int set_max_fd(int max_open_fd);
 int index_dir(Connect *c, std::string& path, Response *r);
 //----------------------------------------------------------------------
 int read_from_client(Connect *c, char *buf, int len);
-int write_to_client(Connect *c, const char *buf, int len);
+int write_to_client(Connect *c, const char *buf, int len, int id);
 int read_request_headers(Connect* c);
 //----------------------------------------------------------------------
 int encode(const char *s_in, char *s_out, int len_out);
@@ -481,7 +482,7 @@ int configure_context(SSL_CTX *ctx);
 SSL_CTX *Init_SSL();
 const char *ssl_strerror(int err);
 int ssl_read(Connect *c, char *buf, int len);
-int ssl_write(Connect *c, const char *buf, int len);
+int ssl_write(Connect *c, const char *buf, int len, int id);
 //----------------------------------------------------------------------
 
 

@@ -9,8 +9,10 @@ static EventHandlerClass event_handler_cl;
 //======================================================================
 EventHandlerClass::~EventHandlerClass()
 {
-    delete [] conn_array;
-    delete [] poll_fd;
+    if (conn_array)
+        delete [] conn_array;
+    if (poll_fd)
+        delete [] poll_fd;
 }
 //----------------------------------------------------------------------
 EventHandlerClass::EventHandlerClass()
@@ -578,7 +580,7 @@ int EventHandlerClass::poll_worker()
 
         if (revents & ((~POLLIN) & (~POLLOUT)))
         {
-            print_err(con, "<%s:%d> !!! Error: fd=%d, revents=0x%02x\n", __func__, __LINE__, fd, revents);
+            print_err(con, "<%s:%d> !!! Error: fd=%d, revents=0x%02x, type_op=%d\n", __func__, __LINE__, fd, revents, con->h2.type_op);
             if ((con->h2.type_op == SSL_ACCEPT) || 
                 (con->h2.type_op == SSL_SHUTDOWN))
             {
@@ -674,11 +676,10 @@ printf(" +++++ worker thread %d run +++++\n", n_thr);
         if (event_handler_cl.wait_conn())
             break;
         event_handler_cl.add_work_list();
-        //event_handler_cl.cgi_set_poll();
+        event_handler_cl.cgi_set_poll();
         event_handler_cl.set_poll();
         if (event_handler_cl.poll_worker() < 0)
             break;
-        event_handler_cl.cgi_set_poll();
     }
 
     print_err("<%s:%d> ***** exit thread %d *****\n", __func__, __LINE__, n_thr);

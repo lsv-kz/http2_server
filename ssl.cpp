@@ -126,6 +126,7 @@ const char *ssl_strerror(int err)
         case SSL_ERROR_WANT_X509_LOOKUP:
             return "SSL_ERROR_WANT_X509_LOOKUP";
         case SSL_ERROR_SYSCALL:
+            print_err("SSL_ERROR_SYSCALL(%s)", strerror(errno));
             return "SSL_ERROR_SYSCALL";
         case SSL_ERROR_ZERO_RETURN:
             return "SSL_ERROR_ZERO_RETURN";
@@ -179,13 +180,9 @@ int ssl_read(Connect *con, char *buf, int len)
     }
 }
 //======================================================================
-int ssl_write(Connect *con, const char *buf, int len)
+int ssl_write(Connect *con, const char *buf, int len, int id)
 {
     ERR_clear_error();
-    if (len > 16384)
-    {
-        print_err(con, "<%s:%d> ??? len=%d\n", __func__, __LINE__, len);
-    }
 
     int ret = SSL_write(con->tls.ssl, buf, len);
     if (ret <= 0)
@@ -202,8 +199,8 @@ int ssl_write(Connect *con, const char *buf, int len)
             con->tls.err = 0;
             return ERR_TRY_AGAIN;
         }
-        print_err(con, "<%s:%d> Error SSL_write(, %p, %d)=%d: %s, errno=%d\n", __func__, __LINE__,
-                    buf, len, ret, ssl_strerror(con->tls.err), errno);
+        print_err(con, "<%s:%d> Error SSL_write(, %p, %d)=%d: %s, errno=%d, id=%d\n", __func__, __LINE__,
+                    buf, len, ret, ssl_strerror(con->tls.err), errno, id);
         return -1;
     }
     else

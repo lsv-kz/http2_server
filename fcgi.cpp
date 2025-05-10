@@ -551,6 +551,7 @@ void EventHandlerClass::fcgi_get_headers(Connect* con, Response *resp)
             cont_type[j] = 0;
             set_frame_headers(resp);
             add_header(resp, 8);
+            add_header(resp, 33, get_time().c_str());
             add_header(resp, 31, cont_type);
             resp->create_headers = true;
             resp->html.offset_add(p - resp->html.ptr());
