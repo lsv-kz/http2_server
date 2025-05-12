@@ -44,6 +44,8 @@ int EventHandlerClass::http2_worker_connections(Connect *con)
         int ret = write_to_client(con, con->h2.settings.ptr_remain(), con->h2.settings.size_remain(), 0);
         if (ret <= 0)
         {
+            if (ret == ERR_TRY_AGAIN)
+                return 0;
             print_err(con, "<%s:%d> Error send frame SETTINGS\n", __func__, __LINE__);
             ssl_shutdown(con);
             return -1;
@@ -479,8 +481,11 @@ int EventHandlerClass::from_client(Connect *con)
         {
             con->h2.frame.cpy("\x0\x0\x8\x6\x1\x0\x0\x0\x0", 9);
             con->h2.frame.cat(buf, 8);
-            if (write_to_client(con, con->h2.frame.ptr(), con->h2.frame.size(), 0) <= 0)
+            int ret = write_to_client(con, con->h2.frame.ptr(), con->h2.frame.size(), 0);
+            if (ret <= 0)
             {
+                if (ret == ERR_TRY_AGAIN)
+                    return 0;
                 print_err(con, "<%s:%d> Error send frame %s,   id=%d\n", __func__, __LINE__, get_str_frame_type(con->h2.type), con->h2.id);
                 return -1;
             }
@@ -541,6 +546,13 @@ int EventHandlerClass::send_headers(Connect *con, Response *resp)
             print_err(con, "<%s:%d> Error send frame HEADERS: %d, id=%d\n", __func__, __LINE__, ret, resp->id);
             if (ret == ERR_TRY_AGAIN)
                 return 0;
+            close_stream(con, resp->id);
+            return -1;
+        }
+        else if (ret != resp->headers.size())
+        {
+            print_err(con, "<%s:%d> Error send frame HEADERS: %d/%d, id=%d\n", __func__, __LINE__, 
+                                ret, resp->headers.size(), resp->id);
             close_stream(con, resp->id);
             return -1;
         }
@@ -621,6 +633,7 @@ int EventHandlerClass::send_response(Connect *con, Response *resp)
 
     if (resp->data.get_byte(4) == 1)
     {
+        print_err(con, "<%s:%d>... send frame DATA, END_STREAM, end request send %lld bytes, data.size=%d ... id=%d\n", __func__, __LINE__, resp->send_bytes, resp->data.size(), resp->id);
         resp->data.init();
         resp->send_end_stream = true;
         print_log(con, con->h2.get(resp->id));

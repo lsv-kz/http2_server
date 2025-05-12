@@ -741,6 +741,7 @@ int set_response(Connect *con, Response *resp)
         snprintf(s, sizeof(s), "%lld", resp->send_cont_length);
         add_header(resp, 28, s);
         add_header(resp, 18, "bytes");
+        add_header(resp, 24, "no-cache, no-store, must-revalidate");
 
         if (resp->file_size == 0)
         {
@@ -858,23 +859,27 @@ int parse_range(const char *s, long long file_size, long long *offset, long long
         if (strlen(p + 2) == 0)
             return -1;
         sscanf(p + 2, "%lld", content_length);
+        if (*content_length > file_size)
+            return -1;
         *offset = file_size - *content_length;
     }
     else
     {
         sscanf(p + 1, "%lld", offset);
+        if (*offset >= file_size)
+            return -1;
         p = strchr(p + 1, '-');
         if (p == NULL)
             return -1;
         if (strlen(p + 1) == 0)
             *content_length = file_size - *offset;
         else
-		{
-			long long end = 0;
-			if (sscanf(p + 1, "%lld", &end) != 1)
-				return -1;
-			*content_length = end + 1 - *offset;
-		}
+        {
+            long long end = 0;
+            if (sscanf(p + 1, "%lld", &end) != 1)
+                return -1;
+            *content_length = end + 1 - *offset;
+        }
     }
     return 0;
 }

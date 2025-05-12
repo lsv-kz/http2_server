@@ -391,14 +391,17 @@ void EventHandlerClass::fcgi_worker(Connect* con, Response *resp, struct pollfd 
         else
         {
             resp->post_cont_length -= resp->cgi.fcgiContentLen;
+            if (resp->cgi.fcgiContentLen > 0)
+            {
+                con->h2.server_window_size -= resp->cgi.fcgiContentLen;
+                resp->cgi.window_update -= resp->cgi.fcgiContentLen;
+                set_frame_window_update(con, 65535 - con->h2.server_window_size);
+                set_frame_window_update(resp, 65535 - resp->cgi.window_update);
+            }
+
             resp->cgi.fcgiContentLen = 0;
             resp->send_ready &= (~RECV_FROM_CLIENT_WAIT);
             resp->cgi.timer = 0;
-            con->h2.server_window_size -= resp->post_data.size();
-            resp->cgi.window_update -= resp->post_data.size();
-            set_frame_window_update(con, 65535 - con->h2.server_window_size);
-            set_frame_window_update(resp, 65535 - resp->cgi.window_update);
-
             resp->post_data.init();
 
             if (resp->post_cont_length == 0)

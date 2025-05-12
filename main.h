@@ -260,6 +260,7 @@ struct http2
 
     ~http2()
     {
+        print_err("%lu<%s:%d> ~~~~ close connect\n", numConn, __func__, __LINE__);
         Response *r = start, *next = NULL;
         for ( ; r; r = next)
         {
