@@ -679,6 +679,12 @@ int set_response(Connect *con, Response *resp)
 
     memcpy(resp->uri, resp->decode_path.c_str(), len);
     resp->uri[len] = 0;
+    int err = clean_path(resp->uri, len);
+    if (err <= 0)
+    {
+        resp_400(resp);
+        return 0;
+    }
     //-------------------------------
     if (!strncmp(resp->decode_path.c_str(), "/cgi-bin/", 9))
     {
@@ -753,6 +759,7 @@ int set_response(Connect *con, Response *resp)
         {
             char s[128];
             snprintf(s, sizeof(s), "bytes %lld-%lld/%lld", resp->offset, resp->offset + resp->send_cont_length - 1, resp->file_size);
+            resp->file_size = resp->send_cont_length;
             add_header(resp, 30, s);
         }
 

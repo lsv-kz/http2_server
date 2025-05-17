@@ -534,6 +534,18 @@ void EventHandlerClass::fcgi_get_headers(Connect* con, Response *resp)
         if ((p3 = strstr_case(resp->html.ptr(), "Status:")))
         {
             sscanf(p3 + 7, "%d", &resp->status);
+            if (resp->status == 204)
+            {
+                set_frame_headers(resp);
+                add_header(resp, 8, "204");
+                add_header(resp, 33, get_time().c_str());
+                add_header(resp, 28, "0");
+                resp->create_headers = true;
+
+                resp->send_cont_length = 0;
+                set_frame_data(resp, 0, FLAG_END_STREAM);
+                return;
+            }
         }
 
         if ((p3 = strstr_case(resp->html.ptr(), "Content-Type:")))
