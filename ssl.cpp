@@ -126,7 +126,7 @@ const char *ssl_strerror(int err)
         case SSL_ERROR_WANT_X509_LOOKUP:
             return "SSL_ERROR_WANT_X509_LOOKUP";
         case SSL_ERROR_SYSCALL:
-            print_err("SSL_ERROR_SYSCALL(%s)", strerror(errno));
+            print_err("SSL_ERROR_SYSCALL(%s)\n", strerror(errno));
             return "SSL_ERROR_SYSCALL";
         case SSL_ERROR_ZERO_RETURN:
             return "SSL_ERROR_ZERO_RETURN";

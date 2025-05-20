@@ -685,6 +685,30 @@ int set_response(Connect *con, Response *resp)
         resp_400(resp);
         return 0;
     }
+
+    if (resp->method == "POST")
+    {
+        if (resp->content_type.size() == 0)
+        {
+            print_err(con, "<%s:%d> Content-Type \?\n", __func__, __LINE__);
+            resp_400(resp);
+            return 0;
+        }
+
+        if (resp->content_length.size() == 0)
+        {
+            print_err(con, "<%s:%d> 411 Length Required\n", __func__, __LINE__);
+            resp_411(resp);
+            return 0;
+        }
+
+        if (resp->post_cont_length >= conf->ClientMaxBodySize)
+        {
+            print_err(con, "<%s:%d> 413 Request entity too large: %lld\n", __func__, __LINE__, resp->post_cont_length);
+            resp_413(resp);
+            return 0;
+        }
+    }
     //-------------------------------
     if (!strncmp(resp->decode_path.c_str(), "/cgi-bin/", 9))
     {
@@ -815,12 +839,20 @@ int set_response(Connect *con, Response *resp)
         set_frame_headers(resp);
         add_header(resp, 8);
         add_header(resp, 33, get_time().c_str());
+        add_header(resp, 31, "text/html");
         resp->create_headers = true;
     }
     else if (resp->content == DYN_PAGE)
     {
         resp->data.init();
         resp->cgi.op = CGI_CREATE;
+        resp->status = RS200;
+        if (resp->method == "POST")
+        {
+            if (con->h2.server_window_size < conf->DataBufSize)
+                set_frame_window_update(con, conf->DataBufSize - con->h2.server_window_size);
+            set_frame_window_update(resp, conf->DataBufSize);
+        }
     }
     else
     {
@@ -828,6 +860,13 @@ int set_response(Connect *con, Response *resp)
         {
             resp->data.init();
             resp->cgi.op = CGI_CREATE;
+            resp->status = RS200;
+            if (resp->method == "POST")
+            {
+                if (con->h2.server_window_size < conf->DataBufSize)
+                    set_frame_window_update(con, conf->DataBufSize - con->h2.server_window_size);
+                set_frame_window_update(resp, conf->DataBufSize);
+            }
         }
         else
         {
@@ -980,6 +1019,44 @@ void resp_404(Response *resp)
     resp->data.cat(err, len);
 }
 //======================================================================
+void resp_411(Response *resp)
+{
+    resp->content = ERROR_TYPE;
+    if (resp->send_headers == false)
+    {
+        set_frame_headers(resp);
+        add_header(resp, 8, "411");
+        add_header(resp, 33, get_time().c_str());
+        add_header(resp, 31, "text/plain");
+        resp->create_headers = true;
+    }
+
+    const char *err = "411 Length Required";
+    int len = strlen(err);
+    resp->send_cont_length = 0;
+    set_frame_data(resp, len, FLAG_END_STREAM);
+    resp->data.cat(err, len);
+}
+//======================================================================
+void resp_413(Response *resp)
+{
+    resp->content = ERROR_TYPE;
+    if (resp->send_headers == false)
+    {
+        set_frame_headers(resp);
+        add_header(resp, 8, "413");
+        add_header(resp, 33, get_time().c_str());
+        add_header(resp, 31, "text/plain");
+        resp->create_headers = true;
+    }
+
+    const char *err = "413 Request entity too large";
+    int len = strlen(err);
+    resp->send_cont_length = 0;
+    set_frame_data(resp, len, FLAG_END_STREAM);
+    resp->data.cat(err, len);
+}
+//======================================================================
 void resp_500(Response *resp)
 {
     resp->content = ERROR_TYPE;
@@ -1041,63 +1118,58 @@ const char *status_resp(int st)
 {
     switch (st)
     {
-        case 0:
-            return "";
-        case RS101:
-            return "101 Switching Protocols";
         case RS200:
-            return "200 OK";
+            return "200";
         case RS204:
-            return "204 No Content";
+            return "204";
         case RS206:
-            return "206 Partial Content";
+            return "206";
         case RS301:
-            return "301 Moved Permanently";
+            return "301";
         case RS302:
-            return "302 Moved Temporarily";
+            return "302";
         case RS400:
-            return "400 Bad Request";
+            return "400";
         case RS401:
-            return "401 Unauthorized";
+            return "401";
         case RS402:
-            return "402 Payment Required";
+            return "402";
         case RS403:
-            return "403 Forbidden";
+            return "403";
         case RS404:
-            return "404 Not Found";
+            return "404";
         case RS405:
-            return "405 Method Not Allowed";
+            return "405";
         case RS406:
-            return "406 Not Acceptable";
+            return "406";
         case RS407:
-            return "407 Proxy Authentication Required";
+            return "407";
         case RS408:
-            return "408 Request Timeout";
+            return "408";
         case RS411:
-            return "411 Length Required";
+            return "411";
         case RS413:
-            return "413 Request entity too large";
+            return "413";
         case RS414:
-            return "414 Request-URI Too Large";
+            return "414";
         case RS416:
-            return "416 Range Not Satisfiable";
+            return "416";
         case RS429:
-            return "429 Too Many Requests";
+            return "429";
         case RS500:
-            return "500 Internal Server Error";
+            return "500";
         case RS501:
-            return "501 Not Implemented";
+            return "501";
         case RS502:
-            return "502 Bad Gateway";
+            return "502";
         case RS503:
-            return "503 Service Unavailable";
+            return "503";
         case RS504:
-            return "504 Gateway Time-out";
+            return "504";
         case RS505:
-            return "505 HTTP Version not supported";
+            return "505";
         default:
-            return "500 Internal Server Error";
+            return "500";
     }
     return "";
 }
-

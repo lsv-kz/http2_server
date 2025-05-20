@@ -467,7 +467,14 @@ int http2::parse(Response *r)
 
         //fprintf(stderr, "<%s:%d> [%s: %s]\n", __func__, __LINE__, name.c_str(), val.c_str());
         if (name == "method")
-            r->method = val;
+        {
+            if (strstr_case(val.c_str(), "post"))
+                r->method = "POST";
+            else if (strstr_case(val.c_str(), "get"))
+                r->method = "GET";
+            else
+                r->method = val;
+        }
         else if (name == "path")
             r->path = val;
         else if (name == "host")

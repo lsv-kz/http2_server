@@ -218,27 +218,6 @@ int fcgi_create_params(Connect *con, Response *resp)
 //======================================================================
 int fcgi_create_connect(Connect *con, Response *resp)
 {
-    if (resp->method == "POST")
-    {
-        if (resp->content_type.size() == 0)
-        {
-            print_err(con, "<%s:%d> Content-Type \?\n", __func__, __LINE__);
-            return -RS400;
-        }
-
-        if (resp->content_length.size() == 0)
-        {
-            print_err(con, "<%s:%d> 411 Length Required\n", __func__, __LINE__);
-            return -RS411;
-        }
-
-        if (resp->post_cont_length >= conf->ClientMaxBodySize)
-        {
-            print_err(con, "<%s:%d> 413 Request entity too large: %lld\n", __func__, __LINE__, resp->post_cont_length);
-            return -RS413;
-        }
-    }
-
     if ((resp->cgi.cgi_type != PHPFPM) && (resp->cgi.cgi_type != FASTCGI))
     {
         print_err(con, "<%s:%d> ? req->scriptType=%d\n", __func__, __LINE__, resp->cgi.cgi_type);
@@ -275,7 +254,7 @@ int fcgi_create_connect(Connect *con, Response *resp)
 
     int ret = fcgi_create_params(con, resp);
     if (ret < 0)
-        return ret;
+        return -RS500;
     return 0;
 }
 //======================================================================
@@ -311,7 +290,8 @@ void EventHandlerClass::fcgi_worker(Connect* con, Response *resp, struct pollfd 
         }
         else if (revents != 0)
         {
-            print_err(con, "<%s:%d> Error 0x%02X(0x%02X), fd=%d\n", __func__, __LINE__, poll_fd->revents, poll_fd->events, poll_fd->fd);
+            print_err(con, "<%s:%d> Error 0x%02X(0x%02X), fd=%d, id=%d\n", __func__, __LINE__, 
+                        poll_fd->revents, poll_fd->events, poll_fd->fd, resp->id);
             create_message(resp, 502);
         }
     }
@@ -395,8 +375,9 @@ void EventHandlerClass::fcgi_worker(Connect* con, Response *resp, struct pollfd 
             {
                 con->h2.server_window_size -= resp->cgi.fcgiContentLen;
                 resp->cgi.window_update -= resp->cgi.fcgiContentLen;
-                set_frame_window_update(con, 65535 - con->h2.server_window_size);
-                set_frame_window_update(resp, 65535 - resp->cgi.window_update);
+
+                set_frame_window_update(con, resp->cgi.fcgiContentLen);
+                set_frame_window_update(resp, resp->cgi.fcgiContentLen);
             }
 
             resp->cgi.fcgiContentLen = 0;
@@ -534,7 +515,7 @@ void EventHandlerClass::fcgi_get_headers(Connect* con, Response *resp)
         if ((p3 = strstr_case(resp->html.ptr(), "Status:")))
         {
             sscanf(p3 + 7, "%d", &resp->status);
-            if (resp->status == 204)
+            if (resp->status == RS204)
             {
                 set_frame_headers(resp);
                 add_header(resp, 8, "204");
@@ -565,7 +546,7 @@ void EventHandlerClass::fcgi_get_headers(Connect* con, Response *resp)
 
             cont_type[j] = 0;
             set_frame_headers(resp);
-            add_header(resp, 8);
+            add_header(resp, 8, status_resp(resp->status));
             add_header(resp, 33, get_time().c_str());
             add_header(resp, 31, cont_type);
             resp->create_headers = true;

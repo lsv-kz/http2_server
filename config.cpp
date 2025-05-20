@@ -264,8 +264,6 @@ int read_conf_file(FILE *fconf)
                 s2 >> c.ServerSoftware;
             else if ((s1 == "MaxConcurrentStreams") && is_number(s2.c_str()))
                 s2 >> c.MaxConcurrentStreams;
-            else if ((s1 == "InitialWindowSize") && is_number(s2.c_str()))
-                s2 >> c.InitialWindowSize;
             else if ((s1 == "TcpNoDelay") && is_bool(s2.c_str()))
                 c.TcpNoDelay = (char)tolower(s2[0]);
             else if ((s1 == "ListenBacklog") && is_number(s2.c_str()))

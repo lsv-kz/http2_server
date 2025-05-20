@@ -26,27 +26,6 @@ int scgi_set_size_data(Connect* con, Response *resp)
 //======================================================================
 int scgi_create_connect(Connect *con, Response *resp)
 {
-    if (resp->method == "POST")
-    {
-        if (resp->content_type.size() == 0)
-        {
-            print_err(con, "<%s:%d> Content-Type \?\n", __func__, __LINE__);
-            return -RS400;
-        }
-
-        if (resp->content_length.size() == 0)
-        {
-            print_err(con, "<%s:%d> 411 Length Required\n", __func__, __LINE__);
-            return -RS411;
-        }
-
-        if (resp->post_cont_length >= conf->ClientMaxBodySize)
-        {
-            print_err(con, "<%s:%d> 413 Request entity too large: %lld\n", __func__, __LINE__, resp->post_cont_length);
-            return -RS413;
-        }
-    }
-
     resp->cgi.fd = create_fcgi_socket(con, resp);
     if (resp->cgi.fd < 0)
     {

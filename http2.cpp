@@ -137,6 +137,7 @@ int EventHandlerClass::http2_worker_connections(Connect *con)
         }
         else
         {
+            print_err(con, "<%s:%d> SSL_SHUTDOWN: SSL_read()=%d\n", __func__, __LINE__, err);
             con->sock_timer = 0;
         }
         return 0;
@@ -361,7 +362,7 @@ int EventHandlerClass::from_client(Connect *con)
                 }
             }
 
-            if (con->h2.header[4])
+            if (con->h2.header[4] == FLAG_ACK)
             {
                 con->h2.ack_recv = true;
             }
@@ -402,13 +403,13 @@ int EventHandlerClass::from_client(Connect *con)
                 print_err(con, "<%s:%d>!!!! cgi.win_up=%ld, id=%d\n", __func__, __LINE__, resp->cgi.window_update, resp->id);
             }
 
-            if (con->h2.header[4] & 1)
+            if (con->h2.header[4] & FLAG_END_STREAM)
             {
                 resp->cgi.end_post_data = true;
             }
 
             const char *p_buf = NULL;
-            if (con->h2.header[4] & 8)
+            if (con->h2.header[4] & FLAG_PADDED)
             {
                 unsigned int padd = (unsigned char)buf[0];
                 con->h2.body_len -= padd;
@@ -631,7 +632,7 @@ int EventHandlerClass::send_response(Connect *con, Response *resp)
         return -1;
     }
 
-    if (resp->data.get_byte(4) == 1)
+    if (resp->data.get_byte(4) == FLAG_END_STREAM)
     {
         print_err(con, "<%s:%d>... send frame DATA, END_STREAM, end request send %lld bytes, data.size=%d ... id=%d\n", __func__, __LINE__, resp->send_bytes, resp->data.size(), resp->id);
         resp->data.init();
@@ -642,19 +643,6 @@ int EventHandlerClass::send_response(Connect *con, Response *resp)
     }
     else
         resp->data.init();
-
-    if (resp->content == DYN_PAGE)
-    {
-        resp->html.init();
-        if (resp->cgi.cgi_end)
-        {
-            print_log(con, con->h2.get(resp->id));
-            close_stream(con, resp->id);
-            return 1;
-        }
-
-        return 1;
-    }
 
     return 1;
 }

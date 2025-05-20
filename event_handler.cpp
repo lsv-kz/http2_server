@@ -194,7 +194,7 @@ int EventHandlerClass::cgi_set_poll()
                         int ret = fcgi_create_connect(c, resp);
                         if (ret < 0)
                         {
-                            create_message(resp, 500);
+                            create_message(resp, ret);
                             continue;
                         }
                         else
@@ -208,7 +208,7 @@ int EventHandlerClass::cgi_set_poll()
                         int ret = scgi_create_connect(c, resp);
                         if (ret < 0)
                         {
-                            create_message(resp, 500);
+                            create_message(resp, RS500);
                             continue;
                         }
                         else
@@ -355,7 +355,7 @@ int EventHandlerClass::cgi_set_poll()
                     {
                         print_err(c, "<%s:%d> ??? fd=%d/%d,  id=%d\n", __func__, __LINE__, 
                                                 fd, resp->cgi.to_script, resp->id);
-                        create_message(resp, 500);
+                        create_message(resp, RS500);
                         continue;
                     }
                     else
@@ -367,7 +367,7 @@ int EventHandlerClass::cgi_set_poll()
                     {
                         print_err(c, "<%s:%d> ??? fd=%d/%d,  id=%d\n", __func__, __LINE__, 
                                                 fd, resp->cgi.from_script, resp->id);
-                        create_message(resp, 500);
+                        create_message(resp, RS500);
                         continue;
                     }
                     else

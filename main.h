@@ -56,14 +56,15 @@ const int  LIMIT_WORK_THREADS = 16;
 const int  LIMIT_PARSE_REQ_THREADS = 128;
 const int  MAX_STREAM = 128;
 
-enum {
+enum { // request status
     RS101 = 101,
-    RS200 = 200,RS204 = 204,RS206 = 206,
+    RS200 = 200, RS204 = 204, RS206 = 206,
     RS301 = 301, RS302,
-    RS400 = 400,RS401,RS402,RS403,RS404,RS405,RS406,RS407,
-    RS408,RS411 = 411,RS413 = 413,RS414,RS415,RS416,RS417,RS418,RS429 = 429,
-    RS500 = 500,RS501,RS502,RS503,RS504,RS505
+    RS400 = 400, RS401, RS402, RS403, RS404, RS405, RS406, RS407,
+    RS408, RS411 = 411, RS413 = 413, RS414, RS415, RS416, RS417, RS418, RS429 = 429,
+    RS500 = 500, RS501, RS502, RS503, RS504, RS505
 };
+
 enum {
     M_GET = 1, M_HEAD, M_POST, M_OPTIONS, M_PUT,
     M_PATCH, M_DELETE, M_TRACE, M_CONNECT
@@ -124,7 +125,6 @@ public:
     std::string PathPHP;
 
     int MaxConcurrentStreams;
-    int InitialWindowSize;
 
     int ListenBacklog;
     char TcpNoDelay;
@@ -237,7 +237,7 @@ struct http2
         header_len = id = body_len = 0;
         window_update = 0;
         init_window_size = 0;
-        server_window_size = 65535;
+        server_window_size = 0;
         max_frame_size = 0;
         num_cgi = 0;
         send_ready = 0;
@@ -246,9 +246,10 @@ struct http2
         len_ = err = 0;
         start = end = NULL;
 
-        settings.cpy("\x00\x00\xc\x04\x00\x00\x00\x00\x00" // SETTINGS (type=0x4)
-                    "\x00\x01\x00\x00\x00\x00"             // SETTINGS_HEADER_TABLE_SIZE (0x1)
-                    "\x00\x03\x00\x00\x00\x00", 9 + 12);   // SETTINGS_MAX_CONCURRENT_STREAMS (0x3)
+        settings.cpy("\x00\x00\x12\x04\x00\x00\x00\x00\x00" // SETTINGS (type=0x4)
+                    "\x00\x01\x00\x00\x00\x00"              // SETTINGS_HEADER_TABLE_SIZE (0x1)
+                    "\x00\x03\x00\x00\x00\x00"              // SETTINGS_MAX_CONCURRENT_STREAMS (0x3)
+                    "\x00\x04\x00\x00\x00\x00", 9 + 18);    // SETTINGS_INITIAL_WINDOW_SIZE (0x4)
 
         settings.set_byte((conf->MaxConcurrentStreams>>24) & 0xff, 17);
         settings.set_byte((conf->MaxConcurrentStreams>>16) & 0xff, 18);
@@ -457,6 +458,8 @@ void resp_204(Response *resp);
 void resp_400(Response *resp);
 void resp_403(Response *resp);
 void resp_404(Response *resp);
+void resp_411(Response *resp);
+void resp_413(Response *resp);
 void resp_500(Response *resp);
 void resp_502(Response *resp);
 void resp_504(Response *resp);

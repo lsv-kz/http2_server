@@ -56,7 +56,7 @@ int EventHandlerClass::cgi_fork(Connect *con, Response *resp, int* serv_cgi, int
     if (stat(resp->cgi.path.c_str(), &st) == -1)
     {
         print_err(con, "<%s:%d> script (%s) not found\n", __func__, __LINE__, resp->cgi.path.c_str());
-        create_message(resp, 404);
+        create_message(resp, RS404);
         return 0;
     }
     //--------------------------- fork ---------------------------------
@@ -195,7 +195,7 @@ int EventHandlerClass::cgi_create_proc(Connect *con, Response *resp)
 
             close(cgi_serv[1]);
             cgi_serv[1] = -1;
-            return -1;
+            return -RS500;
         }
     }
     else
@@ -279,8 +279,9 @@ int EventHandlerClass::cgi_stdin(Connect *con, Response *resp, int fd)
         resp->cgi.timer = 0;
         con->h2.server_window_size -= resp->post_data.size();
         resp->cgi.window_update -= resp->post_data.size();
-        set_frame_window_update(con, 65535 - con->h2.server_window_size);
-        set_frame_window_update(resp, 65535 - resp->cgi.window_update);
+
+        set_frame_window_update(con, resp->post_data.size());
+        set_frame_window_update(resp, resp->post_data.size());
 
         resp->post_data.init();
 
@@ -383,7 +384,7 @@ void EventHandlerClass::cgi_worker(Connect *c, Response *resp, struct pollfd *po
             {
                 print_err(c, "<%s:%d> Error cgi.to_script=%d, fd=%d, id=%d\n", __func__, __LINE__,
                                         resp->cgi.to_script, fd, resp->id);
-                create_message(resp, 500);
+                create_message(resp, RS500);
                 return;
             }
         }
@@ -400,7 +401,7 @@ void EventHandlerClass::cgi_worker(Connect *c, Response *resp, struct pollfd *po
             else if (ret < 0)
             {
                 print_err(c, "<%s:%d> Error cgi_stdin()=%d\n", __func__, __LINE__, ret);
-                create_message(resp, 502);
+                create_message(resp, RS502);
                 return;
             }
             else
@@ -413,7 +414,7 @@ void EventHandlerClass::cgi_worker(Connect *c, Response *resp, struct pollfd *po
         {
             print_err(c, "<%s:%d> Error events/revents=0x%02X/0x%02X, fd=%d,   id=%d\n", __func__, __LINE__,
                     events, revents, fd, resp->id);
-            create_message(resp, 502);
+            create_message(resp, RS502);
         }
     }
     else if (resp->cgi.op == CGI_STDOUT)
@@ -424,7 +425,7 @@ void EventHandlerClass::cgi_worker(Connect *c, Response *resp, struct pollfd *po
             {
                 print_err(c, "<%s:%d> Error cgi.from_script=%d, fd=%d, 0x%02X,  id=%d\n", __func__, __LINE__,
                                         resp->cgi.from_script, fd, revents, resp->id);
-                create_message(resp, 502);
+                create_message(resp, RS502);
                 return;
             }
         }
@@ -488,9 +489,9 @@ void EventHandlerClass::cgi_worker(Connect *c, Response *resp, struct pollfd *po
                         if ((p3 = strstr_case(resp->html.ptr(), "Status:")))
                         {
                             sscanf(p3 + 7, "%d", &resp->status);
-                            if (resp->status == 204)
+                            if (resp->status == RS204)
                             {
-                                create_message(resp, 204);
+                                create_message(resp, RS204);
                                 resp->send_cont_length = 0;
                                 set_frame_data(resp, 0, FLAG_END_STREAM);
 
@@ -525,7 +526,7 @@ void EventHandlerClass::cgi_worker(Connect *c, Response *resp, struct pollfd *po
 
                             cont_type[j] = 0;
                             set_frame_headers(resp);
-                            add_header(resp, 8);
+                            add_header(resp, 8, status_resp(resp->status));
                             add_header(resp, 33, get_time().c_str());
                             add_header(resp, 31, cont_type);
                             resp->create_headers = true;
@@ -577,7 +578,7 @@ void EventHandlerClass::cgi_worker(Connect *c, Response *resp, struct pollfd *po
                 }
                 else
                 {
-                    create_message(resp, 500);
+                    create_message(resp, RS500);
                 }
             }
 

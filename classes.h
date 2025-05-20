@@ -222,7 +222,7 @@ struct Response
         cgi.fcgiContentLen = cgi.fcgiPaddingLen = 0;
         cgi.timer = 0;
         cgi.send_to_cgi = cgi.recv_from_cgi = 0;
-        cgi.window_update = 65535;
+        cgi.window_update = 0;
     }
 
     ~Response()
