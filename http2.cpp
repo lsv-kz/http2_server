@@ -41,6 +41,25 @@ int EventHandlerClass::http2_worker_connections(Connect *con)
     }
     else if (con->h2.type_op == SEND_SETTINGS)
     {
+        if (con->h2.settings.size_remain() == 0)
+        {
+            if ((con->fd_revents & POLLIN) || (con->io_status == WORK))
+            {
+                if (from_client(con) < 0)
+                {
+                    ssl_shutdown(con);
+                    return -1;
+                }
+            }
+
+            if (con->h2.settings.size_remain() == 0)
+            {
+                print_err(con, "<%s:%d> Error recv frame %s\n", __func__, __LINE__, get_str_frame_type(con->h2.type));
+                ssl_shutdown(con);
+                return -1;
+            }
+        }
+
         int ret = write_to_client(con, con->h2.settings.ptr_remain(), con->h2.settings.size_remain(), 0);
         if (ret <= 0)
         {
@@ -51,13 +70,17 @@ int EventHandlerClass::http2_worker_connections(Connect *con)
             return -1;
         }
 
-        con->h2.settings.offset_add(ret);
+        con->h2.settings.set_offset(ret);
 
         if (con->h2.settings.size_remain() == 0)
         {
             con->sock_timer = 0;
-            con->h2.type_op = WORK_STREAM;
-            con->io_status = WORK;
+            if (con->h2.settings.get_byte(4) == 1)
+            {
+                con->h2.type_op = WORK_STREAM;
+                con->io_status = WORK;
+            }
+            con->h2.settings.init();
         }
     }
     else if (con->h2.type_op == SSL_ACCEPT)
@@ -362,6 +385,8 @@ int EventHandlerClass::from_client(Connect *con)
                 }
             }
 
+            con->h2.settings.cpy("\x00\x00\x00\x04\x01\x00\x00\x00\x00", 9);
+
             if (con->h2.header[4] == FLAG_ACK)
             {
                 con->h2.ack_recv = true;
@@ -400,7 +425,7 @@ int EventHandlerClass::from_client(Connect *con)
 
             if (resp->cgi.window_update <= 0)
             {
-                print_err(con, "<%s:%d>!!!! cgi.win_up=%ld, id=%d\n", __func__, __LINE__, resp->cgi.window_update, resp->id);
+                print_err(resp, "<%s:%d>!!!! cgi.win_up=%ld, id=%d\n", __func__, __LINE__, resp->cgi.window_update, resp->id);
             }
 
             if (con->h2.header[4] & FLAG_END_STREAM)
@@ -437,7 +462,7 @@ int EventHandlerClass::from_client(Connect *con)
 
                 if (resp->cgi.fcgiContentLen)
                 {
-                    print_err(con, "<%s:%d> !!! Error resp->cgi.fcgiContentLen=%d, id=%d\n", __func__, __LINE__,
+                    print_err(resp, "<%s:%d> !!! Error resp->cgi.fcgiContentLen=%d, id=%d\n", __func__, __LINE__,
                             resp->cgi.fcgiContentLen, resp->id);
                     send_rst_stream(con, con->h2.id);
                     close_stream(con, con->h2.id);
@@ -448,7 +473,7 @@ int EventHandlerClass::from_client(Connect *con)
 
             if (resp->post_cont_length < 0)
             {
-                print_err(con, "<%s:%d> !!! Error: cont_length=%lld, h2.body_len=%d, size=%d, id=%d\n", __func__, __LINE__,
+                print_err(resp, "<%s:%d> !!! Error: cont_length=%lld, h2.body_len=%d, size=%d, id=%d\n", __func__, __LINE__,
                             resp->post_cont_length, con->h2.body_len, resp->post_data.size(), resp->id);
                 send_rst_stream(con, con->h2.id);
                 close_stream(con, con->h2.id);
@@ -457,7 +482,8 @@ int EventHandlerClass::from_client(Connect *con)
         }
         else if (con->h2.type == HEADERS)
         {
-            Response *resp = con->h2.add();
+            con->numReq++;
+            Response *resp = con->h2.add(con->numConn, con->numReq);
             if (resp == NULL)
             {
                 print_err(con, "<%s:%d> Error id=%d\n", __func__, __LINE__, con->h2.id);
@@ -467,7 +493,7 @@ int EventHandlerClass::from_client(Connect *con)
 
             if (set_response(con, resp))
             {
-                print_err(con, "<%s:%d> !!! Error set_response id=%d\n", __func__, __LINE__, con->h2.id);
+                print_err(resp, "<%s:%d> !!! Error set_response id=%d\n", __func__, __LINE__, con->h2.id);
                 send_rst_stream(con, con->h2.id);
                 close_stream(con, con->h2.id);
                 return 0;
@@ -475,11 +501,12 @@ int EventHandlerClass::from_client(Connect *con)
         }
         else if (con->h2.type == GOAWAY)
         {
-            //print_err(con, "<%s:%d> GOAWAY [%u] id=%d\n", __func__, __LINE__, (unsigned int)buf[7], con->h2.id);
+            print_err(con, "<%s:%d> GOAWAY [%u] id=%d\n", __func__, __LINE__, (unsigned int)buf[7], con->h2.id);
             return -1;
         }
         else if (con->h2.type == PING)
         {
+            print_err(con, "<%s:%d> --- recv PING --- id=%d\n", __func__, __LINE__, con->h2.id);
             con->h2.frame.cpy("\x0\x0\x8\x6\x1\x0\x0\x0\x0", 9);
             con->h2.frame.cat(buf, 8);
             int ret = write_to_client(con, con->h2.frame.ptr(), con->h2.frame.size(), 0);
@@ -544,7 +571,7 @@ int EventHandlerClass::send_headers(Connect *con, Response *resp)
         int ret = write_to_client(con, resp->headers.ptr(), resp->headers.size(), resp->id);
         if (ret <= 0)
         {
-            print_err(con, "<%s:%d> Error send frame HEADERS: %d, id=%d\n", __func__, __LINE__, ret, resp->id);
+            print_err(resp, "<%s:%d> Error send frame HEADERS: %d, id=%d\n", __func__, __LINE__, ret, resp->id);
             if (ret == ERR_TRY_AGAIN)
                 return 0;
             close_stream(con, resp->id);
@@ -552,7 +579,7 @@ int EventHandlerClass::send_headers(Connect *con, Response *resp)
         }
         else if (ret != resp->headers.size())
         {
-            print_err(con, "<%s:%d> Error send frame HEADERS: %d/%d, id=%d\n", __func__, __LINE__, 
+            print_err(resp, "<%s:%d> Error send frame HEADERS: %d/%d, id=%d\n", __func__, __LINE__, 
                                 ret, resp->headers.size(), resp->id);
             close_stream(con, resp->id);
             return -1;
@@ -565,7 +592,7 @@ int EventHandlerClass::send_headers(Connect *con, Response *resp)
     }
     else
     {
-        print_err(con, "<%s:%d> Error id=%d\n", __func__, __LINE__, resp->id);
+        print_err(resp, "<%s:%d> Error id=%d\n", __func__, __LINE__, resp->id);
         exit(1);
     }
     return 1;
@@ -580,13 +607,13 @@ int EventHandlerClass::send_response(Connect *con, Response *resp)
 
     if (resp->window_update < (resp->data.size() - 9))
     {
-        print_err(con, "<%s:%d> !!! window_update [%ld], id=%d\n", __func__, __LINE__, resp->window_update, resp->id);
+        print_err(resp, "<%s:%d> !!! window_update [%ld], id=%d\n", __func__, __LINE__, resp->window_update, resp->id);
         return 0;
     }
 
     if (con->h2.window_update < (resp->data.size() - 9))
     {
-        print_err(con, "<%s:%d> !!! h2.window_update(%ld) < (resp->data.size() - 9), id=%d\n", __func__, __LINE__, con->h2.window_update, resp->id);
+        print_err(resp, "<%s:%d> !!! h2.window_update(%ld) < (resp->data.size() - 9), id=%d\n", __func__, __LINE__, con->h2.window_update, resp->id);
         return 1;
     }
 
@@ -609,12 +636,12 @@ int EventHandlerClass::send_response(Connect *con, Response *resp)
     {
         if (ret == ERR_TRY_AGAIN)
         {
-            print_err(con, "<%s:%d> Error send frame DATA: %d, %d, id=%d\n", __func__, __LINE__,
+            print_err(resp, "<%s:%d> Error send frame DATA: %d, %d, id=%d\n", __func__, __LINE__,
                                                 ret, resp->data.size(), resp->id);
             return ERR_TRY_AGAIN;
         }
 
-        print_err(con, "<%s:%d> Error send frame DATA: %d, %d, id=%d\n", __func__, __LINE__,
+        print_err(resp, "<%s:%d> Error send frame DATA: %d, %d, id=%d\n", __func__, __LINE__,
                                                 ret, resp->data.size(), resp->id);
         close_stream(con, resp->id);
         return -1;
@@ -628,13 +655,13 @@ int EventHandlerClass::send_response(Connect *con, Response *resp)
 
     if (ret != resp->data.size())
     {
-        print_err(con, "<%s:%d> Error send frame DATA send %d bytes, size=%d, id=%d\n", __func__, __LINE__, ret, resp->data.size(), resp->id);
+        print_err(resp, "<%s:%d> Error send frame DATA send %d bytes, size=%d, id=%d\n", __func__, __LINE__, ret, resp->data.size(), resp->id);
         return -1;
     }
 
     if (resp->data.get_byte(4) == FLAG_END_STREAM)
     {
-        print_err(con, "<%s:%d>... send frame DATA, END_STREAM, end request send %lld bytes, data.size=%d ... id=%d\n", __func__, __LINE__, resp->send_bytes, resp->data.size(), resp->id);
+        print_err(resp, "<%s:%d>... send frame DATA, END_STREAM, end request send %lld bytes, data.size=%d ... id=%d\n", __func__, __LINE__, resp->send_bytes, resp->data.size(), resp->id);
         resp->data.init();
         resp->send_end_stream = true;
         print_log(con, con->h2.get(resp->id));
@@ -648,17 +675,17 @@ int EventHandlerClass::send_response(Connect *con, Response *resp)
 }
 //======================================================================
 const char *huf_map[][2] = {
-                        {" ", "010100"},           // 0
-                        {"!", "1111111000"},       // 1
-                        {"\"", "1111111001"},      // 2
-                        {"#", "111111111010"},     // 3
-                        {"$", "1111111111001"},    // 4
-                        {"%%", "010101"},          // 5
-                        {"&", "11111000"},         // 6
-                        {"'", "11111111010"},      // 7
-                        {"(", "1111111010"},       // 8
-                        {")", "1111111011"},       // 9
-                        {"*", "11111001"},         // 10
+                        {" ", "010100"},
+                        {"!", "1111111000"},
+                        {"\"", "1111111001"},
+                        {"#", "111111111010"},
+                        {"$", "1111111111001"},
+                        {"%%", "010101"},
+                        {"&", "11111000"},
+                        {"'", "11111111010"},
+                        {"(", "1111111010"},
+                        {")", "1111111011"},
+                        {"*", "11111001"},
                         {"+", "11111111011"},
                         {",", "11111010"},
                         {"-", "010110"},
@@ -668,7 +695,7 @@ const char *huf_map[][2] = {
                         {"1", "00001"},
                         {"2", "00010"},
                         {"3", "011001"},
-                        {"4", "011010"},           // 20
+                        {"4", "011010"},
                         {"5", "011011"},
                         {"6", "011100"},
                         {"7", "011101"},
@@ -678,7 +705,7 @@ const char *huf_map[][2] = {
                         {";", "11111011"},
                         {"<", "111111111111100"},
                         {"=", "100000"},
-                        {">", "111111111011"},     // 30
+                        {">", "111111111011"},
                         {"?", "1111111100"},
                         {"@", "1111111111010"},
                         {"A", "100001"},
@@ -688,7 +715,7 @@ const char *huf_map[][2] = {
                         {"E", "1100000"},
                         {"F", "1100001"},
                         {"G", "1100010"},
-                        {"H", "1100011"},          // 40
+                        {"H", "1100011"},
                         {"I", "1100100"},
                         {"J", "1100101"},
                         {"K", "1100110"},
@@ -698,7 +725,7 @@ const char *huf_map[][2] = {
                         {"O", "1101010"},
                         {"P", "1101011"},
                         {"Q", "1101100"},
-                        {"R", "1101101"},          // 50
+                        {"R", "1101101"},
                         {"S", "1101110"},
                         {"T", "1101111"},
                         {"U", "1110000"},
@@ -708,7 +735,7 @@ const char *huf_map[][2] = {
                         {"Y", "1110011"},
                         {"Z", "11111101"},
                         {"[", "1111111111011"},
-                        {"\\", "1111111111111110000"},  //60
+                        {"\\", "1111111111111110000"},
                         {"]", "1111111111100"},
                         {"^", "11111111111100"},
                         {"_", "100010"},
@@ -718,7 +745,7 @@ const char *huf_map[][2] = {
                         {"c", "00100"},
                         {"d", "100100"},
                         {"e", "00101"},
-                        {"f", "100101"},                // 70
+                        {"f", "100101"},
                         {"g", "100110"},
                         {"h", "100111"},
                         {"i", "00110"},
@@ -728,7 +755,7 @@ const char *huf_map[][2] = {
                         {"m", "101001"},
                         {"n", "101010"},
                         {"o", "00111"},
-                        {"p", "101011"},                // 80
+                        {"p", "101011"},
                         {"q", "1110110"},
                         {"r", "101100"},
                         {"s", "01000"},
@@ -738,12 +765,12 @@ const char *huf_map[][2] = {
                         {"w", "1111000"},
                         {"x", "1111001"},
                         {"y", "1111010"},
-                        {"z", "1111011"},                // 90
+                        {"z", "1111011"},
                         {"{", "111111111111110"},
                         {"|", "11111111100"},
                         {"}", "11111111111101"},
-                        {"~", "1111111111101"},          // 94
-                        {NULL, NULL}};                   // 95
+                        {"~", "1111111111101"},
+                        {NULL, NULL}};
 //======================================================================
 const char *static_tab[][2] = {
                          {"", ""},

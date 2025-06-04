@@ -220,7 +220,7 @@ struct http2
         size_ = n;
     }
 
-    Response *add();
+    Response *add(unsigned long numConn, unsigned long numReq);
     void del_from_list(Response *r);
     int close_stream(http2 *h2, int id, int *num_cgi);
     int set_window_size(unsigned long num_conn, int id, long n);
@@ -242,7 +242,7 @@ struct http2
         num_cgi = 0;
         send_ready = 0;
 
-        size_ = 0;
+        size_ = conf->MaxConcurrentStreams;
         len_ = err = 0;
         start = end = NULL;
 
@@ -255,8 +255,6 @@ struct http2
         settings.set_byte((conf->MaxConcurrentStreams>>16) & 0xff, 18);
         settings.set_byte((conf->MaxConcurrentStreams>>8) & 0xff, 19);
         settings.set_byte(conf->MaxConcurrentStreams & 0xff, 20);
-
-        settings.cat("\x00\x00\x00\x04\x01\x00\x00\x00\x00", 9);
     }
 
     ~http2()
@@ -299,6 +297,7 @@ public:
     char remoteHost[NI_MAXHOST + NI_MAXSERV];
 
     unsigned long numConn;
+    unsigned long numReq;
     int    clientSocket;
     time_t sock_timer;
 
@@ -314,8 +313,6 @@ public:
     } tls;
 
     http2 h2;
-    //------------------------------------------------------------------
-    void init();
 };
 //======================================================================
 class EventHandlerClass
@@ -470,6 +467,7 @@ void create_logfiles(const std::string &);
 void close_logs();
 void print_err(const char *format, ...);
 void print_err(Connect *c, const char *format, ...);
+void print_err(Response *c, const char *format, ...);
 void print_log(Connect *c, Response *r);
 //----------------------------------------------------------------------
 void ssl_shutdown(Connect *c);

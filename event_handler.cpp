@@ -69,28 +69,28 @@ void EventHandlerClass::create_message(Response *r, int status)
 {
     switch (status)
     {
-        case 200:
+        case RS200:
             resp_200(r);
             break;
-        case 204:
+        case RS204:
             resp_204(r);
             break;
-        case 400:
+        case RS400:
             resp_400(r);
             break;
-        case 403:
+        case RS403:
             resp_403(r);
             break;
-        case 404:
+        case RS404:
             resp_404(r);
             break;
-        case 500:
+        case RS500:
             resp_500(r);
             break;
-        case 502:
+        case RS502:
             resp_502(r);
             break;
-        case 504:
+        case RS504:
             resp_504(r);
             break;
         default:
@@ -151,7 +151,7 @@ int EventHandlerClass::cgi_set_poll()
                         t - resp->cgi.timer, resp->post_data.size(), c->io_status, resp->cgi.op, resp->id);
                 c->h2.frame_win_update.init();
                 resp->frame_win_update.init();
-                create_message(resp, 504);
+                create_message(resp, RS504);
             }
             else
             {
@@ -167,7 +167,7 @@ int EventHandlerClass::cgi_set_poll()
                         if (cgi_create_proc(c, resp) < 0)
                         {
                             print_err(c, "<%s:%d> Error cgi_create_proc()\n", __func__, __LINE__);
-                            create_message(resp, 500);
+                            create_message(resp, RS500);
                             continue;
                         }
 
@@ -335,12 +335,13 @@ int EventHandlerClass::cgi_set_poll()
         if (!resp)
             continue;
         //------------------------ loop Responses -----------------------
-        for ( int i = 0; resp && (i < c->h2.num_cgi); resp = resp_next, ++i)
+        for ( int i = 0; resp && (i < c->h2.num_cgi); resp = resp_next)
         {
             resp_next = resp->next;
             
             if (resp->content != DYN_PAGE)
                 continue;
+            ++i;
 
             int fd = poll_fd[resp->cgi.num_poll].fd;
             int revents = poll_fd[resp->cgi.num_poll].revents;

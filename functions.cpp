@@ -648,7 +648,7 @@ int set_frame_data(Connect *con, Response *resp)
             int flag = (resp->send_cont_length > 0) ? 0 : FLAG_END_STREAM;
             set_frame_data(resp, data_len, flag);
             resp->data.cat(resp->html.ptr_remain(), data_len);
-            resp->html.offset_add(data_len);
+            resp->html.set_offset(data_len);
         }
     }
 
@@ -932,7 +932,6 @@ int parse_range(const char *s, long long file_size, long long *offset, long long
 //======================================================================
 void resp_200(Response *resp)
 {
-    resp->content = ERROR_TYPE;
     if (resp->send_headers == false)
     {
         set_frame_headers(resp);
@@ -951,7 +950,6 @@ void resp_200(Response *resp)
 //======================================================================
 void resp_204(Response *resp)
 {
-    resp->content = ERROR_TYPE;
     set_frame_headers(resp);
     add_header(resp, 8, "204");
     add_header(resp, 33, get_time().c_str());
@@ -964,7 +962,6 @@ void resp_204(Response *resp)
 //======================================================================
 void resp_400(Response *resp)
 {
-    resp->content = ERROR_TYPE;
     if (resp->send_headers == false)
     {
         set_frame_headers(resp);
@@ -983,7 +980,6 @@ void resp_400(Response *resp)
 //======================================================================
 void resp_403(Response *resp)
 {
-    resp->content = ERROR_TYPE;
     if (resp->send_headers == false)
     {
         set_frame_headers(resp);
@@ -1002,7 +998,6 @@ void resp_403(Response *resp)
 //======================================================================
 void resp_404(Response *resp)
 {
-    resp->content = ERROR_TYPE;
     if (resp->send_headers == false)
     {
         set_frame_headers(resp);
@@ -1021,7 +1016,6 @@ void resp_404(Response *resp)
 //======================================================================
 void resp_411(Response *resp)
 {
-    resp->content = ERROR_TYPE;
     if (resp->send_headers == false)
     {
         set_frame_headers(resp);
@@ -1040,7 +1034,6 @@ void resp_411(Response *resp)
 //======================================================================
 void resp_413(Response *resp)
 {
-    resp->content = ERROR_TYPE;
     if (resp->send_headers == false)
     {
         set_frame_headers(resp);
@@ -1059,7 +1052,6 @@ void resp_413(Response *resp)
 //======================================================================
 void resp_500(Response *resp)
 {
-    resp->content = ERROR_TYPE;
     if (resp->send_headers == false)
     {
         set_frame_headers(resp);
@@ -1078,7 +1070,6 @@ void resp_500(Response *resp)
 //======================================================================
 void resp_502(Response *resp)
 {
-    resp->content = ERROR_TYPE;
     if (resp->send_headers == false)
     {
         set_frame_headers(resp);
@@ -1097,7 +1088,6 @@ void resp_502(Response *resp)
 //======================================================================
 void resp_504(Response *resp)
 {
-    resp->content = ERROR_TYPE;
     if (resp->send_headers == false)
     {
         set_frame_headers(resp);

@@ -104,18 +104,43 @@ mtxLog.lock();
 mtxLog.unlock();
 }
 //======================================================================
+void print_err(Response *resp, const char *format, ...)
+{
+    va_list ap;
+    char buf[300];
+
+    va_start(ap, format);
+    vsnprintf(buf, sizeof(buf), format, ap);
+    va_end(ap);
+
+    String ss(256);
+    ss << "[" << log_time() << "] - [" << resp->numConn << "/" << resp->numReq << "] " << buf;
+
+mtxLog.lock();
+    write(flog_err, ss.c_str(), ss.size());
+    num_logerr_records++;
+    if (num_logerr_records > 100000)
+    {
+        exit(1);
+        close(flog_err);
+        create_error_logfile(conf->LogPath);
+        num_logerr_records = 0;
+    }
+mtxLog.unlock();
+}
+//======================================================================
 void print_log(Connect *r, Response *resp)
 {
     String ss(320);
     if (resp)
     {
-        ss  << r->numConn << "/" << resp->id << " - " << r->remoteAddr << " - [" << log_time()
+        ss  << r->numConn << "/" << resp->numReq << " - " << r->remoteAddr << " - [" << log_time()
             << "] - \"" << resp->method.c_str() << " " << resp->decode_path.c_str() << " HTTP/2\" - "
             << resp->status << " " << resp->send_bytes << " - \"" << resp->user_agent << "\" - id=" << resp->id << "\n";
     }
     else
     {
-        ss << r->numConn << "/" << resp->id << " - " << r->remoteAddr << ":" << r->remotePort
+        ss << r->numConn << "/" << resp->numReq << " - " << r->remoteAddr << ":" << r->remotePort
            << " - [" << log_time() << "] - Error resp=NULL\n";
     }
 

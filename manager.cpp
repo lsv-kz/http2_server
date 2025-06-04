@@ -195,8 +195,8 @@ void manager(int sockServer)
             break;
         }
 
-        req->init();
         req->numConn = ++allConn;
+        req->numReq = 0;
         req->serverSocket = sockServer;
         req->clientSocket = clientSocket;
 

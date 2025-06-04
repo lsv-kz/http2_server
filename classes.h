@@ -40,83 +40,13 @@ extern const char *static_tab[][2];
 
 void print_err(const char *format, ...);
 //======================================================================
-class DynamicTable
-{
-    Header *table;
-    int table_size;
-    int table_len;
-    int offset;
-    int err;
-
-    DynamicTable();
-    DynamicTable(const DynamicTable&);
-    DynamicTable& operator= (const DynamicTable&);
-
-public:
-
-    DynamicTable(int n, int offs)
-    {
-        table_size = n;
-        offset = offs;
-        table_len = err = 0;
-        table = new(std::nothrow) Header [table_size];
-        if (!table)
-        {
-            fprintf(stderr, "<%s:%d> Error: %s\n", __func__, __LINE__, strerror(errno));
-            table_size = 0;
-            err = 1;
-            return;
-        }
-    }
-    //------------------------------------------------------------------
-    ~DynamicTable()
-    {
-        if (table)
-        {
-            fprintf(stderr, "<%s:%d> delete dyn table\n", __func__, __LINE__);
-            delete [] table;
-            table = NULL;
-        }
-    }
-    //------------------------------------------------------------------
-    void add(const char *name, const char *val)
-    {
-        if (table_len == table_size)
-            --table_len;
-
-        for ( int i = table_len; i > 0; --i)
-        {
-            table[i] = table[i - 1];
-        }
-
-        table[0] = Header{name, val};
-        ++table_len;
-    }
-    //------------------------------------------------------------------
-    void print()
-    {
-        for ( int i = 0; i < table_len; ++i)
-        {
-            fprintf(stderr, " name: %s, val: %s\n", table[i].name.c_str(), table[i].val.c_str());
-        }
-    }
-    //------------------------------------------------------------------
-    Header *get(int n)
-    {
-        if ((n < offset) || (n >= (table_len + offset)))
-        {
-            fprintf(stderr, "<%s:%d> Error ind=%d\n", __func__, __LINE__, n);
-            return NULL;
-        }
-
-        return &table[n - offset];
-    }
-};
-//======================================================================
 struct Response
 {
     Response *prev;
     Response *next;
+    
+    unsigned long numConn;
+    unsigned long numReq;
 
     int id;
     int len;
@@ -204,6 +134,7 @@ struct Response
 
     Response()
     {
+        numConn = numReq = 0;
         status = 0;
         uri[0] = 0;
         id = 0;
@@ -255,6 +186,79 @@ struct Response
 private:
     Response(const Response&);
     Response& operator=(const Response&);
+};
+//======================================================================
+class DynamicTable
+{
+    Header *table;
+    int table_size;
+    int table_len;
+    int offset;
+    int err;
+
+    DynamicTable();
+    DynamicTable(const DynamicTable&);
+    DynamicTable& operator= (const DynamicTable&);
+
+public:
+
+    DynamicTable(int n, int offs)
+    {
+        table_size = n;
+        offset = offs;
+        table_len = err = 0;
+        table = new(std::nothrow) Header [table_size];
+        if (!table)
+        {
+            fprintf(stderr, "<%s:%d> Error: %s\n", __func__, __LINE__, strerror(errno));
+            table_size = 0;
+            err = 1;
+            return;
+        }
+    }
+    //------------------------------------------------------------------
+    ~DynamicTable()
+    {
+        if (table)
+        {
+            fprintf(stderr, "<%s:%d> delete dyn table\n", __func__, __LINE__);
+            delete [] table;
+            table = NULL;
+        }
+    }
+    //------------------------------------------------------------------
+    void add(const char *name, const char *val)
+    {
+        if (table_len == table_size)
+            --table_len;
+
+        for ( int i = table_len; i > 0; --i)
+        {
+            table[i] = table[i - 1];
+        }
+
+        table[0] = Header{name, val};
+        ++table_len;
+    }
+    //------------------------------------------------------------------
+    void print()
+    {
+        for ( int i = 0; i < table_len; ++i)
+        {
+            fprintf(stderr, " name: %s, val: %s\n", table[i].name.c_str(), table[i].val.c_str());
+        }
+    }
+    //------------------------------------------------------------------
+    Header *get(int n)
+    {
+        if ((n < offset) || (n >= (table_len + offset)))
+        {
+            fprintf(stderr, "<%s:%d> Error ind=%d\n", __func__, __LINE__, n);
+            return NULL;
+        }
+
+        return &table[n - offset];
+    }
 };
 
 #endif

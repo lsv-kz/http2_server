@@ -64,6 +64,11 @@ public:
         buf_len = offset = 0;
     }
     //------------------------------------------------------------------
+    void reserve(unsigned int n)
+    {
+        resize(n);
+    }
+    //------------------------------------------------------------------
     int cpy(const char *b, int len)
     {
         if (buf_size <= len)
@@ -229,7 +234,7 @@ public:
     int size() { return buf_len; }
     int size_remain() { return buf_len - offset; }
     int get_offset () { return offset; }
-    int offset_add (int n)
+    int set_offset (int n)
     {
         if ((offset + n) > buf_len)
         {

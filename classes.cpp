@@ -1,12 +1,7 @@
 #include "main.h"
 
 //======================================================================
-void Connect::init()
-{
-    h2.init(conf->MaxConcurrentStreams);
-}
-//======================================================================
-Response *http2::add()
+Response *http2::add(unsigned long numConn, unsigned long numReq)
 {
     if (len_ >= size_)
     {
@@ -22,6 +17,8 @@ Response *http2::add()
         return NULL;
     }
 
+    resp->numConn = numConn;
+    resp->numReq = numReq;
     resp->len = body_len;
     resp->type = type;
     resp->flags = flags;
@@ -86,10 +83,9 @@ int http2::close_stream(http2 *h2, int id, int *num_cgi)
         next = r->next;
         if (r->id == id)
         {
-            if (r->content == DYN_PAGE)
+            if (r->cgi.start)
             {
-                if (r->cgi.start)
-                    (*num_cgi)--;
+                (*num_cgi)--;
                 if (r->cgi.cgi_type <= PHPCGI)
                 {
                     h2->num_cgi--;

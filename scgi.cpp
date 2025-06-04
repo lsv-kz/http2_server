@@ -19,7 +19,7 @@ int scgi_set_size_data(Connect* con, Response *resp)
         return -1;
 
     resp->cgi.buf_param.cat(",", 1);
-    resp->cgi.buf_param.offset_add(i);
+    resp->cgi.buf_param.set_offset(i);
 
     return 0;
 }
@@ -161,7 +161,7 @@ int scgi_create_params(Connect *con, Response *resp)
     }
 
     param.name = "SCRIPT_NAME";
-    param.val = resp->decode_path;
+    param.val = resp->uri;
     resp->cgi.vPar.push_back(param);
     ++i;
 
@@ -256,14 +256,14 @@ void EventHandlerClass::scgi_worker(Connect* con, Response *resp, struct pollfd 
                     con->io_status = WAIT;
                 else
                 {
-                    create_message(resp, 502);
+                    create_message(resp, RS502);
                 }
 
                 return;
             }
 
             resp->cgi.timer = 0;
-            resp->cgi.buf_param.offset_add(ret);
+            resp->cgi.buf_param.set_offset(ret);
             if (resp->cgi.buf_param.size_remain() == 0)
             {
                 resp->cgi.buf_param.init();
@@ -290,7 +290,7 @@ void EventHandlerClass::scgi_worker(Connect* con, Response *resp, struct pollfd 
         else
         {
             print_err("<%s:%d> Error 0x%02X(0x%02X), fd=%d\n", __func__, __LINE__, poll_fd->revents, poll_fd->events, poll_fd->fd);
-            create_message(resp, 502);
+            create_message(resp, RS502);
         }
     }
 }

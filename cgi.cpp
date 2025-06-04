@@ -269,7 +269,7 @@ int EventHandlerClass::cgi_stdin(Connect *con, Response *resp, int fd)
     resp->cgi.send_to_cgi += ret;
     if (ret != resp->post_data.size_remain())
     {
-        resp->post_data.offset_add(ret);
+        resp->post_data.set_offset(ret);
         resp->cgi.timer = 0;
         //resp->send_ready |= RECV_FROM_CLIENT_WAIT;
     }
@@ -530,7 +530,7 @@ void EventHandlerClass::cgi_worker(Connect *c, Response *resp, struct pollfd *po
                             add_header(resp, 33, get_time().c_str());
                             add_header(resp, 31, cont_type);
                             resp->create_headers = true;
-                            resp->html.offset_add(p - resp->html.ptr());
+                            resp->html.set_offset(p - resp->html.ptr());
 
                             if (resp->html.size() > resp->html.get_offset())
                             {
