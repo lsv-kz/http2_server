@@ -71,7 +71,7 @@ $(OBJSDIR)/functions.o: functions.cpp $(DEPS)
 $(OBJSDIR)/index.o: index.cpp $(DEPS)
 	$(CC) $(CFLAGS) -c index.cpp -o $@
 
-$(OBJSDIR)/log.o: log.cpp main.h string__.h
+$(OBJSDIR)/log.o: log.cpp $(DEPS)
 	$(CC) $(CFLAGS) -c log.cpp -o $@
 
 clean:

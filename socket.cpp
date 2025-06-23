@@ -83,7 +83,7 @@ int create_server_socket(const Config *conf)
     return sockfd;
 }
 //======================================================================
-int create_fcgi_socket(Connect *con, Response *resp)
+int create_fcgi_socket(Stream *resp)
 {
     int sockfd, n;
     char addr[256];
@@ -98,14 +98,14 @@ int create_fcgi_socket(Connect *con, Response *resp)
         sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
         if (sockfd == -1)
         {
-            print_err(con, "<%s:%d> Error socket(): %s\n", __func__, __LINE__, strerror(errno));
+            print_err(resp, "<%s:%d> Error socket(): %s\n", __func__, __LINE__, strerror(errno));
             return -1;
         }
 
         const int sock_opt = 1;
         if (setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, (void *)&sock_opt, sizeof(sock_opt)))
         {
-            print_err(con, "<%s:%d> Error setsockopt(TCP_NODELAY): %s\n", __func__, __LINE__, strerror(errno));
+            print_err(resp, "<%s:%d> Error setsockopt(TCP_NODELAY): %s\n", __func__, __LINE__, strerror(errno));
             close(sockfd);
             return -1;
         }
@@ -115,7 +115,7 @@ int create_fcgi_socket(Connect *con, Response *resp)
         if (inet_aton(addr, &(sock_addr.sin_addr)) == 0)
 //      if (inet_pton(AF_INET, addr, &(sock_addr.sin_addr)) < 1)
         {
-            print_err(con, "<%s:%d> Error inet_pton(%s): %s\n", __func__, __LINE__, addr, strerror(errno));
+            print_err(resp, "<%s:%d> Error inet_pton(%s): %s\n", __func__, __LINE__, addr, strerror(errno));
             close(sockfd);
             return -1;
         }
@@ -123,7 +123,7 @@ int create_fcgi_socket(Connect *con, Response *resp)
         int flags = 1;
         if (ioctl(sockfd, FIONBIO, &flags) == -1)
         {
-            print_err(con, "<%s:%d> Error ioctl(FIONBIO, 1): %s\n", __func__, __LINE__, strerror(errno));
+            print_err(resp, "<%s:%d> Error ioctl(FIONBIO, 1): %s\n", __func__, __LINE__, strerror(errno));
             return -1;
         }
 
@@ -131,18 +131,15 @@ int create_fcgi_socket(Connect *con, Response *resp)
         {
             if (errno != EINPROGRESS)
             {
-                print_err(con, "<%s:%d> Error connect(%s): %s\n", __func__, __LINE__, resp->cgi.socket->c_str(), strerror(errno));
+                print_err(resp, "<%s:%d> Error connect(%s): %s\n", __func__, __LINE__, resp->cgi.socket->c_str(), strerror(errno));
                 close(sockfd);
                 return -1;
             }
             else
             {
-                con->io_status = WAIT;
                 errno = 0;
             }
         }
-        else
-            con->io_status = WORK;
     }
     else //==== PF_UNIX ====
     {
@@ -150,7 +147,7 @@ int create_fcgi_socket(Connect *con, Response *resp)
         sockfd = socket(PF_UNIX, SOCK_STREAM, 0);
         if (sockfd == -1)
         {
-            print_err(con, "<%s:%d> Error socket(): %s\n", __func__, __LINE__, strerror(errno));
+            print_err(resp, "<%s:%d> Error socket(): %s\n", __func__, __LINE__, strerror(errno));
             return -1;
         }
 
@@ -160,7 +157,7 @@ int create_fcgi_socket(Connect *con, Response *resp)
         int flags = fcntl(sockfd, F_GETFL);
         if (flags == -1)
         {
-            print_err(con, "<%s:%d> Error fcntl(, F_GETFL, ): %s\n", __func__, __LINE__, strerror(errno));
+            print_err(resp, "<%s:%d> Error fcntl(, F_GETFL, ): %s\n", __func__, __LINE__, strerror(errno));
             return -1;
         }
         else
@@ -168,7 +165,7 @@ int create_fcgi_socket(Connect *con, Response *resp)
             flags |= O_NONBLOCK;
             if (fcntl(sockfd, F_SETFL, flags) == -1)
             {
-                print_err(con, "<%s:%d> Error fcntl(, F_SETFL, ): %s\n", __func__, __LINE__, strerror(errno));
+                print_err(resp, "<%s:%d> Error fcntl(, F_SETFL, ): %s\n", __func__, __LINE__, strerror(errno));
                 return -1;
             }
         }
@@ -177,24 +174,21 @@ int create_fcgi_socket(Connect *con, Response *resp)
         {
             if (errno != EINPROGRESS)
             {
-                print_err(con, "<%s:%d> Error connect(%s): %s\n", __func__, __LINE__, resp->cgi.socket->c_str(), strerror(errno));
+                print_err(resp, "<%s:%d> Error connect(%s): %s\n", __func__, __LINE__, resp->cgi.socket->c_str(), strerror(errno));
                 close(sockfd);
                 return -1;
             }
             else
             {
-                con->io_status = WAIT;
                 errno = 0;
             }
         }
-        else
-            con->io_status = WORK;
     }
 
     int flags = fcntl(sockfd, F_GETFD);
     if (flags == -1)
     {
-        print_err(con, "<%s:%d> Error fcntl(F_GETFD): %s\n", __func__, __LINE__, strerror(errno));
+        print_err(resp, "<%s:%d> Error fcntl(F_GETFD): %s\n", __func__, __LINE__, strerror(errno));
         close(sockfd);
         return -1;
     }
@@ -202,7 +196,7 @@ int create_fcgi_socket(Connect *con, Response *resp)
     flags |= FD_CLOEXEC;
     if (fcntl(sockfd, F_SETFD, flags) == -1)
     {
-        print_err(con, "<%s:%d> Error fcntl(F_SETFD, FD_CLOEXEC): %s\n", __func__, __LINE__, strerror(errno));
+        print_err(resp, "<%s:%d> Error fcntl(F_SETFD, FD_CLOEXEC): %s\n", __func__, __LINE__, strerror(errno));
         close(sockfd);
         return -1;
     }

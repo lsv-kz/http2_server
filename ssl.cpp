@@ -36,8 +36,11 @@ static int select_alpn(const unsigned char **out, unsigned char *outlen,
         {
             *out = (unsigned char *)&in[i + 1];
             *outlen = in[i];
+            hex_print_stderr(__func__, __LINE__, &in[i + 1], in[i]);
             return 0;
         }
+        else
+            hex_print_stderr(__func__, __LINE__, &in[i + 1], in[i]);
     }
     return -1;
 }
@@ -61,6 +64,7 @@ static int alpn_select_proto_cb(SSL *ssl, const unsigned char **out,
                                 unsigned char *outlen, const unsigned char *in,
                                 unsigned int inlen, void *arg)
 {
+    hex_print_stderr(__func__, __LINE__, in, inlen);
     int rv = select_next_protocol((unsigned char **)out, outlen, in, inlen);
     if (rv == 0)
     {
@@ -115,24 +119,24 @@ const char *ssl_strerror(int err)
 {
     switch (err)
     {
-        case SSL_ERROR_NONE:
+        case SSL_ERROR_NONE: // 0
             return "SSL_ERROR_NONE";
-        case SSL_ERROR_SSL:
+        case SSL_ERROR_SSL:  // 1
             return "SSL_ERROR_SSL";
-        case SSL_ERROR_WANT_READ:
+        case SSL_ERROR_WANT_READ:  // 2
             return "SSL_ERROR_WANT_READ";
-        case SSL_ERROR_WANT_WRITE:
+        case SSL_ERROR_WANT_WRITE:  // 3
             return "SSL_ERROR_WANT_WRITE";
-        case SSL_ERROR_WANT_X509_LOOKUP:
+        case SSL_ERROR_WANT_X509_LOOKUP:  // 4
             return "SSL_ERROR_WANT_X509_LOOKUP";
-        case SSL_ERROR_SYSCALL:
+        case SSL_ERROR_SYSCALL:  // 5
             print_err("SSL_ERROR_SYSCALL(%s)\n", strerror(errno));
             return "SSL_ERROR_SYSCALL";
-        case SSL_ERROR_ZERO_RETURN:
+        case SSL_ERROR_ZERO_RETURN:  // 6
             return "SSL_ERROR_ZERO_RETURN";
-        case SSL_ERROR_WANT_CONNECT:
+        case SSL_ERROR_WANT_CONNECT:  // 7
             return "SSL_ERROR_WANT_CONNECT";
-        case SSL_ERROR_WANT_ACCEPT:
+        case SSL_ERROR_WANT_ACCEPT:  // 8
             return "SSL_ERROR_WANT_ACCEPT";
     }
 

@@ -1,7 +1,7 @@
 #include "main.h"
 
 //======================================================================
-Response *http2::add(unsigned long numConn, unsigned long numReq)
+Stream *http2::add()
 {
     if (len_ >= size_)
     {
@@ -9,8 +9,8 @@ Response *http2::add(unsigned long numConn, unsigned long numReq)
         return NULL;
     }
 
-    Response *resp = NULL;
-    resp = new(std::nothrow) Response;
+    Stream *resp = NULL;
+    resp = new(std::nothrow) Stream;
     if (!resp)
     {
         print_err("<%s:%d> Error: %s\n", __func__, __LINE__, strerror(errno));
@@ -19,6 +19,10 @@ Response *http2::add(unsigned long numConn, unsigned long numReq)
 
     resp->numConn = numConn;
     resp->numReq = numReq;
+
+    resp->remoteAddr = remoteAddr;
+    resp->remotePort = remotePort;
+
     resp->len = body_len;
     resp->type = type;
     resp->flags = flags;
@@ -53,7 +57,7 @@ Response *http2::add(unsigned long numConn, unsigned long numReq)
     return resp;
 }
 //------------------------------------------------------------------
-void http2::del_from_list(Response *r)
+void http2::del_from_list(Stream *r)
 {
     if (r->prev && r->next)
     {
@@ -77,15 +81,25 @@ void http2::del_from_list(Response *r)
 //------------------------------------------------------------------
 int http2::close_stream(http2 *h2, int id, int *num_cgi)
 {
-    Response *r = start, *next = NULL;
+    Stream *r = start, *next = NULL;
     for ( ; r; r = next)
     {
         next = r->next;
         if (r->id == id)
         {
+            if (h2->next == r)
+            {
+                print_err("<%s:%d> !!!!! h2->next == r\n", __func__, __LINE__);
+                h2->next = next;
+            }
+
             if (r->cgi.start)
             {
-                (*num_cgi)--;
+                print_err("<%s:%d>~~~~~~~ close cgi stream, id=%d \n", __func__, __LINE__, r->id);
+                if (*num_cgi <= 0)
+                    print_err("<%s:%d>~~~~~~~ Error: *num_cgi=%d, id=%d \n", __func__, __LINE__, *num_cgi, r->id);
+                else
+                    (*num_cgi)--;
                 if (r->cgi.cgi_type <= PHPCGI)
                 {
                     h2->num_cgi--;
@@ -104,7 +118,7 @@ int http2::close_stream(http2 *h2, int id, int *num_cgi)
 //------------------------------------------------------------------
 int http2::set_window_size(unsigned long num_conn, int id, long n)
 {
-    Response *r = start, *next = NULL;
+    Stream *r = start, *next = NULL;
     for ( ; r; r = next)
     {
         next = r->next;
@@ -118,9 +132,9 @@ int http2::set_window_size(unsigned long num_conn, int id, long n)
     return id;
 }
 //------------------------------------------------------------------
-Response *http2::get(int id)
+Stream *http2::get(int id)
 {
-    Response *r = start, *next = NULL;
+    Stream *r = start, *next = NULL;
     for ( ; r; r = next)
     {
         next = r->next;
@@ -131,11 +145,11 @@ Response *http2::get(int id)
     return NULL;
 }
 //------------------------------------------------------------------
-Response *http2::get()
+Stream *http2::get()
 {
     if (start)
     {
-        Response *rtmp = start;
+        Stream *rtmp = start;
         return rtmp;
     }
     else
@@ -183,7 +197,7 @@ int http2::bytes_to_int(unsigned char prefix, const char *s, int *len, int size)
     return n;
 }
 //------------------------------------------------------------------
-int http2::parse(Response *r)
+int http2::parse(Stream *r)
 {
     int len = 0;
     int ch;

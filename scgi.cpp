@@ -2,7 +2,7 @@
 
 using namespace std;
 //======================================================================
-int scgi_set_size_data(Connect* con, Response *resp)
+int scgi_set_size_data(Connect* con, Stream *resp)
 {
     resp->cgi.buf_param.set_byte(':', 7);
     int i = 6;
@@ -24,9 +24,9 @@ int scgi_set_size_data(Connect* con, Response *resp)
     return 0;
 }
 //======================================================================
-int scgi_create_connect(Connect *con, Response *resp)
+int scgi_create_connect(Connect *con, Stream *resp)
 {
-    resp->cgi.fd = create_fcgi_socket(con, resp);
+    resp->cgi.fd = create_fcgi_socket(resp);
     if (resp->cgi.fd < 0)
     {
         print_err(con, "<%s:%d> Error connect to scgi\n", __func__, __LINE__);
@@ -44,7 +44,7 @@ int scgi_create_connect(Connect *con, Response *resp)
     return 0;
 }
 //======================================================================
-int scgi_create_params(Connect *con, Response *resp)
+int scgi_create_params(Connect *con, Stream *resp)
 {
     int i = 0;
     Param param;
@@ -102,12 +102,12 @@ int scgi_create_params(Connect *con, Response *resp)
     ++i;
 
     param.name = "REMOTE_ADDR";
-    param.val = con->remoteAddr;
+    param.val = con->h2.remoteAddr;
     resp->cgi.vPar.push_back(param);
     ++i;
 
     param.name = "REMOTE_PORT";
-    param.val = con->remotePort;
+    param.val = con->h2.remotePort;
     resp->cgi.vPar.push_back(param);
     ++i;
 
@@ -192,7 +192,7 @@ int scgi_create_params(Connect *con, Response *resp)
     return 0;
 }
 //======================================================================
-int scgi_set_param(Connect *con, Response *resp)
+int scgi_set_param(Connect *con, Stream *resp)
 {
     resp->cgi.buf_param.cpy("\0\0\0\0\0\0\0\0", 8);
     for ( ; resp->cgi.i_param < resp->cgi.size_par; ++resp->cgi.i_param)
@@ -242,7 +242,7 @@ int scgi_set_param(Connect *con, Response *resp)
     return resp->cgi.buf_param.size();
 }
 //======================================================================
-void EventHandlerClass::scgi_worker(Connect* con, Response *resp, struct pollfd *poll_fd)
+void EventHandlerClass::scgi_worker(Connect* con, Stream *resp, struct pollfd *poll_fd)
 {
     int revents = poll_fd->revents;
     if (resp->cgi.scgi_op == SCGI_PARAMS)
@@ -252,9 +252,7 @@ void EventHandlerClass::scgi_worker(Connect* con, Response *resp, struct pollfd 
             int ret = write_to_fcgi(resp->cgi.fd, resp->cgi.buf_param.ptr_remain(), resp->cgi.buf_param.size_remain());
             if (ret < 0)
             {
-                if (ret == ERR_TRY_AGAIN)
-                    con->io_status = WAIT;
-                else
+                if (ret != ERR_TRY_AGAIN)
                 {
                     create_message(resp, RS502);
                 }

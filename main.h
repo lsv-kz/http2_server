@@ -72,7 +72,6 @@ enum {
 
 enum OPERATION_HTTP2 { SSL_ACCEPT = 1, PREFACE_MESSAGE, SEND_SETTINGS, WORK_STREAM, SSL_SHUTDOWN, };
 
-enum IO_STATUS { WAIT = 1, WORK };
 enum DIRECT { TIME_OUT, FROM_CLIENT, TO_CLIENT };
 
 //----------------------------------------------------------------------
@@ -178,10 +177,16 @@ extern const Config* const conf;
 //======================================================================
 struct http2
 {
-    Response *start;
-    Response *end;
+    Stream *start;
+    Stream *end;
+
+    Stream *next;
 
     unsigned long numConn;
+    unsigned long numReq;
+
+    char remoteAddr[NI_MAXHOST];
+    char remotePort[NI_MAXSERV];
 
     long init_window_size;
     long max_frame_size;
@@ -220,16 +225,16 @@ struct http2
         size_ = n;
     }
 
-    Response *add(unsigned long numConn, unsigned long numReq);
-    void del_from_list(Response *r);
+    Stream *add();
+    void del_from_list(Stream *r);
     int close_stream(http2 *h2, int id, int *num_cgi);
     int set_window_size(unsigned long num_conn, int id, long n);
-    Response *get(int id);
-    Response *get();
+    Stream *get(int id);
+    Stream *get();
     int size();
     int pow_(int x, int y);
     int bytes_to_int(unsigned char prefix, const char *s, int *len, int size);
-    int parse(Response *r);
+    int parse(Stream *r);
 
     http2()
     {
@@ -249,18 +254,20 @@ struct http2
         settings.cpy("\x00\x00\x12\x04\x00\x00\x00\x00\x00" // SETTINGS (type=0x4)
                     "\x00\x01\x00\x00\x00\x00"              // SETTINGS_HEADER_TABLE_SIZE (0x1)
                     "\x00\x03\x00\x00\x00\x00"              // SETTINGS_MAX_CONCURRENT_STREAMS (0x3)
-                    "\x00\x04\x00\x00\x00\x00", 9 + 18);    // SETTINGS_INITIAL_WINDOW_SIZE (0x4)
+                    "\x00\x04\x00\x00\x3e\x80", 9 + 18);    // SETTINGS_INITIAL_WINDOW_SIZE (0x4)
 
         settings.set_byte((conf->MaxConcurrentStreams>>24) & 0xff, 17);
         settings.set_byte((conf->MaxConcurrentStreams>>16) & 0xff, 18);
         settings.set_byte((conf->MaxConcurrentStreams>>8) & 0xff, 19);
         settings.set_byte(conf->MaxConcurrentStreams & 0xff, 20);
+
+        settings.cat("\x00\x00\x00\x04\x01\x00\x00\x00\x00", 9);
     }
 
     ~http2()
     {
-        print_err("%lu<%s:%d> ~~~~ close connect\n", numConn, __func__, __LINE__);
-        Response *r = start, *next = NULL;
+        print_err("[%lu] <%s:%d> ~~~~ close connect\n", numConn, __func__, __LINE__);
+        Stream *r = start, *next = NULL;
         for ( ; r; r = next)
         {
             next = r->next;
@@ -292,16 +299,12 @@ public:
 
     static int serverSocket;
 
-    char remoteAddr[NI_MAXHOST];
-    char remotePort[NI_MAXSERV];
-    char remoteHost[NI_MAXHOST + NI_MAXSERV];
-
     unsigned long numConn;
-    unsigned long numReq;
+
     int    clientSocket;
     time_t sock_timer;
 
-    IO_STATUS io_status;
+    int ssl_pending;
     int fd_revents;
     int fd_events;
 
@@ -320,7 +323,7 @@ class EventHandlerClass
     std::mutex mtx_thr, mtx_cgi;
     std::condition_variable cond_thr;
 
-    int num_wait, num_work, num_cgi;
+    int num_wait, num_work, all_cgi, num_cgi_poll;
     int close_thr;
     unsigned long num_request;
 
@@ -343,27 +346,25 @@ class EventHandlerClass
     int http2_worker_streams(Connect *c);
 
     int send_html(Connect *c);
-    int set_pollfd_array(Connect *c, int i);
-    int from_client(Connect *c);
-    int send_headers(Connect *c, Response *r);
-    int send_response(Connect *c, Response *r);
+    int recv_from_client(Connect *c);
+    int send_response(Connect *c, Stream *r);
 
-    void cgi_worker(Connect* c, Response *resp);
+    void cgi_worker(Connect* c, Stream *resp);
 
     int send_window_update(Connect *c);
-    int send_window_update(Connect *c, Response *r);
+    int send_window_update(Connect *c, Stream *r);
 
-    int cgi_create_proc(Connect *c, Response *r);
-    int cgi_fork(Connect *c, Response *r, int* serv_cgi, int* cgi_serv);
-    int cgi_stdin(Connect *c, Response *r, int fd);
-    int cgi_stdout(Connect *c, Response *r, int fd);
-    void cgi_worker(Connect *c, Response *r, struct pollfd *p);
+    int cgi_create_proc(Stream *r);
+    int cgi_fork(Stream *r, int* serv_cgi, int* cgi_serv);
+    int cgi_stdin(Stream *r, int fd);
+    int cgi_stdout(Stream *r, int fd);
+    void cgi_worker(Connect *c, Stream *r, struct pollfd *p);
 
-    void scgi_worker(Connect* c, Response *r, struct pollfd *p);
-    void fcgi_worker(Connect* c, Response *r, struct pollfd *p);
-    void fcgi_get_headers(Connect* con, Response *r);
+    void scgi_worker(Connect* c, Stream *r, struct pollfd *p);
+    void fcgi_worker(Connect* c, Stream *r, struct pollfd *p);
+    void fcgi_get_headers(Connect* con, Stream *r);
 
-    void create_message(Response *r, int status);
+    void create_message(Stream *r, int status);
     
     void close_stream(Connect *c, int id);
 
@@ -392,27 +393,28 @@ public:
 };
 //----------------------------------------------------------------------
 int write_to_fcgi(int fd, const char *buf, int len);
-int create_fcgi_socket(Connect *c, Response *r);
+int create_fcgi_socket(Stream *r);
 
-int scgi_create_connect(Connect *c, Response *r);
-int scgi_create_params(Connect *c, Response *r);
-int scgi_set_param(Connect *c, Response *r);
-int scgi_set_size_data(Connect* c, Response *r);
+int scgi_create_connect(Connect *c, Stream *r);
+int scgi_create_params(Connect *c, Stream *r);
+int scgi_set_param(Connect *c, Stream *r);
+int scgi_set_size_data(Connect* c, Stream *r);
 
 void fcgi_set_header(ByteArray* ba, unsigned char type);
-int fcgi_create_connect(Connect *c, Response *r);
+void fcgi_set_header(char *s, unsigned char type, int dataLen);
+int fcgi_create_connect(Stream *r);
 //----------------------------------------------------------------------
-void kill_chld(Response *r);
-int cgi_fork(Response *r, int* serv_cgi, int* cgi_serv);
-int cgi_create_proc(Connect *c, Response *r);
-int iscgi(Connect* conn, Response *resp);
+void kill_chld(Stream *r);
+int cgi_fork(Stream *r, int* serv_cgi, int* cgi_serv);
+int cgi_create_proc(Connect *c, Stream *r);
+int iscgi(Stream *resp);
 //----------------------------------------------------------------------
 extern char **environ;
 //----------------------------------------------------------------------
 int read_conf_file(const char *path_conf);
 int set_max_fd(int max_open_fd);
 //----------------------------------------------------------------------
-int index_dir(Connect *c, std::string& path, Response *r);
+int index_dir(Connect *c, std::string& path, Stream *r);
 //----------------------------------------------------------------------
 int read_from_client(Connect *c, char *buf, int len);
 int write_to_client(Connect *c, const char *buf, int len, int id);
@@ -437,38 +439,38 @@ int clean_path(char *path, int len);
 const char *content_type(const char *s);
 long long file_size(const char *s);
 
-void set_frame(Response *resp, char *s, int len, int type, HTTP2_FLAGS flags, int id);
-void set_frame_headers(Response *r);
-void set_frame_data(Response *resp, int len, int flag);
-int set_frame_data(Connect *con, Response *r);
-void add_header(Response *r, int ind);
-void add_header(Response *r, int ind, const char *val);
+void set_frame(Stream *resp, char *s, int len, int type, HTTP2_FLAGS flags, int id);
+void set_frame_headers(Stream *r);
+void set_frame_data(Stream *resp, int len, int flag);
+int set_frame_data(Connect *con, Stream *r);
+void add_header(Stream *r, int ind);
+void add_header(Stream *r, int ind, const char *val);
 void set_frame_window_update(Connect *c, int len);
-void set_frame_window_update(Response *r, int len);
+void set_frame_window_update(Stream *r, int len);
 int send_rst_stream(Connect *c, int id);
-int set_response(Connect *c, Response *r);
+int set_response(Connect *c, Stream *r);
 CONTENT_TYPE get_content_type(const char *path);
 int parse_range(const char *s, long long file_size, long long *offset, long long *content_length);
 
-void resp_200(Response *resp);
-void resp_204(Response *resp);
-void resp_400(Response *resp);
-void resp_403(Response *resp);
-void resp_404(Response *resp);
-void resp_411(Response *resp);
-void resp_413(Response *resp);
-void resp_500(Response *resp);
-void resp_502(Response *resp);
-void resp_504(Response *resp);
-
+void resp_200(Stream *resp);
+void resp_204(Stream *resp);
+void resp_400(Stream *resp);
+void resp_403(Stream *resp);
+void resp_404(Stream *resp);
+void resp_411(Stream *resp);
+void resp_413(Stream *resp);
+void resp_500(Stream *resp);
+void resp_502(Stream *resp);
+void resp_504(Stream *resp);
+void hex_print_stderr(const char *s, int line, const void *p, int n);
 const char *status_resp(int st);
 //----------------------------------------------------------------------
 void create_logfiles(const std::string &);
 void close_logs();
 void print_err(const char *format, ...);
 void print_err(Connect *c, const char *format, ...);
-void print_err(Response *c, const char *format, ...);
-void print_log(Connect *c, Response *r);
+void print_err(Stream *r, const char *format, ...);
+void print_log(Stream *r);
 //----------------------------------------------------------------------
 void ssl_shutdown(Connect *c);
 void close_connect(Connect *c);

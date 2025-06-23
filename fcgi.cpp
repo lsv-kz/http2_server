@@ -17,7 +17,19 @@ void fcgi_set_header(ByteArray* ba, unsigned char type)
     ba->set_byte(0, 7);
 }
 //======================================================================
-void fcgi_set_param(Connect *con, Response *resp)
+void fcgi_set_header(char *s, unsigned char type, int dataLen)
+{
+    s[0] = (unsigned char)FCGI_VERSION_1;
+    s[1] = (unsigned char)type;
+    s[2] = (unsigned char)((1 >> 8) & 0xff);
+    s[3] = (unsigned char)((1) & 0xff);
+    s[4] = (unsigned char)((dataLen >> 8) & 0xff);
+    s[5] = (unsigned char)((dataLen) & 0xff);
+    s[6] = 0;
+    s[7] = 0;
+}
+//======================================================================
+void fcgi_set_param(Stream *resp)
 {
     resp->cgi.buf_param.reserve(4096);
     resp->cgi.buf_param.cpy("\0\0\0\0\0\0\0\0", 8);
@@ -69,7 +81,7 @@ void fcgi_set_param(Connect *con, Response *resp)
     fcgi_set_header(&resp->cgi.buf_param, FCGI_PARAMS);
 }
 //======================================================================
-int fcgi_create_params(Connect *con, Response *resp)
+int fcgi_create_params(Stream *resp)
 {
     int i = 0;
     Param param;
@@ -106,12 +118,12 @@ int fcgi_create_params(Connect *con, Response *resp)
     ++i;
 
     param.name = "REMOTE_ADDR";
-    param.val = con->remoteAddr;
+    param.val = resp->remoteAddr;
     resp->cgi.vPar.push_back(param);
     ++i;
 
     param.name = "REMOTE_PORT";
-    param.val = con->remotePort;
+    param.val = resp->remotePort;
     resp->cgi.vPar.push_back(param);
     ++i;
 
@@ -206,7 +218,7 @@ int fcgi_create_params(Connect *con, Response *resp)
 
     if (i != (int)resp->cgi.vPar.size())
     {
-        print_err(con, "<%s:%d> Error: create fcgi param list\n", __func__, __LINE__);
+        print_err(resp, "<%s:%d> Error: create fcgi param list\n", __func__, __LINE__);
         return -RS500;
     }
 
@@ -217,21 +229,21 @@ int fcgi_create_params(Connect *con, Response *resp)
     return 0;
 }
 //======================================================================
-int fcgi_create_connect(Connect *con, Response *resp)
+int fcgi_create_connect(Stream *resp)
 {
     if ((resp->cgi.cgi_type != PHPFPM) && (resp->cgi.cgi_type != FASTCGI))
     {
-        print_err(con, "<%s:%d> ? req->scriptType=%d\n", __func__, __LINE__, resp->cgi.cgi_type);
+        print_err(resp, "<%s:%d> ? req->scriptType=%d\n", __func__, __LINE__, resp->cgi.cgi_type);
         return -RS500;
     }
 
     if (resp->cgi.cgi_type == PHPFPM)
         resp->cgi.socket = &conf->PathPHP;
 
-    resp->cgi.fd = create_fcgi_socket(con, resp);
+    resp->cgi.fd = create_fcgi_socket(resp);
     if (resp->cgi.fd < 0)
     {
-        print_err(con, "<%s:%d> Error connect to scgi\n", __func__, __LINE__);
+        print_err(resp, "<%s:%d> Error connect to scgi\n", __func__, __LINE__);
         return resp->cgi.fd;
     }
 
@@ -253,13 +265,13 @@ int fcgi_create_connect(Connect *con, Response *resp)
     resp->cgi.buf_param.cpy(s, 16);
     resp->cgi.fcgi_op = FASTCGI_BEGIN;
 
-    int ret = fcgi_create_params(con, resp);
+    int ret = fcgi_create_params(resp);
     if (ret < 0)
         return -RS500;
     return 0;
 }
 //======================================================================
-void EventHandlerClass::fcgi_worker(Connect* con, Response *resp, struct pollfd *poll_fd)
+void EventHandlerClass::fcgi_worker(Connect* con, Stream *resp, struct pollfd *poll_fd)
 {
     int revents = poll_fd->revents;
     int fd = poll_fd->fd;
@@ -271,11 +283,9 @@ void EventHandlerClass::fcgi_worker(Connect* con, Response *resp, struct pollfd 
             int ret = write_to_fcgi(resp->cgi.fd, resp->cgi.buf_param.ptr_remain(), resp->cgi.buf_param.size_remain());
             if (ret < 0)
             {
-                if (ret == ERR_TRY_AGAIN)
-                    con->io_status = WAIT;
-                else
+                if (ret != ERR_TRY_AGAIN)
                 {
-                    create_message(resp, RS502);
+                    create_message(resp, 502);
                 }
 
                 return;
@@ -291,7 +301,7 @@ void EventHandlerClass::fcgi_worker(Connect* con, Response *resp, struct pollfd 
         }
         else if (revents != 0)
         {
-            print_err(con, "<%s:%d> Error 0x%02X(0x%02X), fd=%d, id=%d\n", __func__, __LINE__, 
+            print_err(resp, "<%s:%d> Error 0x%02X(0x%02X), fd=%d, id=%d\n", __func__, __LINE__, 
                         poll_fd->revents, poll_fd->events, poll_fd->fd, resp->id);
             create_message(resp, RS502);
         }
@@ -302,15 +312,13 @@ void EventHandlerClass::fcgi_worker(Connect* con, Response *resp, struct pollfd 
         {
             if (resp->cgi.buf_param.size_remain() == 0)
             {
-                fcgi_set_param(con, resp);
+                fcgi_set_param(resp);
             }
 
             int ret = write_to_fcgi(resp->cgi.fd, resp->cgi.buf_param.ptr_remain(), resp->cgi.buf_param.size_remain());
             if (ret < 0)
             {
-                if (ret == ERR_TRY_AGAIN)
-                    con->io_status = WAIT;
-                else
+                if (ret != ERR_TRY_AGAIN)
                 {
                     create_message(resp, RS502);
                 }
@@ -337,7 +345,7 @@ void EventHandlerClass::fcgi_worker(Connect* con, Response *resp, struct pollfd 
         }
         else
         {
-            print_err(con, "<%s:%d> FASTCGI_PARAMS Error revents=0x%02X: %s; id=%d\n", __func__, __LINE__, revents, resp->id);
+            print_err(resp, "<%s:%d> FASTCGI_PARAMS Error revents=0x%02X: %s; id=%d\n", __func__, __LINE__, revents, resp->id);
             create_message(resp, RS502);
         }
     }
@@ -345,7 +353,7 @@ void EventHandlerClass::fcgi_worker(Connect* con, Response *resp, struct pollfd 
     {
         if (revents != POLLOUT)
         {
-            print_err(con, "<%s:%d> FASTCGI_STDIN Error revents=0x%02X: %s; id=%d\n", __func__, __LINE__, revents, resp->id);
+            print_err(resp, "<%s:%d> FASTCGI_STDIN Error revents=0x%02X: %s; id=%d\n", __func__, __LINE__, revents, resp->id);
             create_message(resp, RS502);
             return;
         }
@@ -355,7 +363,7 @@ void EventHandlerClass::fcgi_worker(Connect* con, Response *resp, struct pollfd 
         {
             if (errno != EAGAIN)
             {
-                print_err(con, "<%s:%d> Error write()=%d: %s; id=%d\n", __func__, __LINE__, ret, strerror(errno), resp->id);
+                print_err(resp, "<%s:%d> Error write()=%d: %s; id=%d\n", __func__, __LINE__, ret, strerror(errno), resp->id);
                 resp->post_data.init();
                 create_message(resp, RS502);
             }
@@ -365,24 +373,14 @@ void EventHandlerClass::fcgi_worker(Connect* con, Response *resp, struct pollfd 
         resp->cgi.send_to_cgi += ret;
         if (ret != resp->post_data.size_remain())
         {
+            print_err(resp, "<%s:%d> !!! Error write()=%d(%d); id=%d\n", __func__, __LINE__, ret, resp->post_data.size_remain(), resp->id);
             resp->post_data.set_offset(ret);
             resp->cgi.timer = 0;
-            resp->send_ready |= RECV_FROM_CLIENT_WAIT;
         }
         else
         {
             resp->post_cont_length -= resp->cgi.fcgiContentLen;
-            if (resp->cgi.fcgiContentLen > 0)
-            {
-                con->h2.server_window_size -= resp->cgi.fcgiContentLen;
-                resp->cgi.window_update -= resp->cgi.fcgiContentLen;
-
-                set_frame_window_update(con, resp->cgi.fcgiContentLen);
-                set_frame_window_update(resp, resp->cgi.fcgiContentLen);
-            }
-
             resp->cgi.fcgiContentLen = 0;
-            resp->send_ready &= (~RECV_FROM_CLIENT_WAIT);
             resp->cgi.timer = 0;
             resp->post_data.init();
 
@@ -397,7 +395,7 @@ void EventHandlerClass::fcgi_worker(Connect* con, Response *resp, struct pollfd 
     {
         if (revents != POLLIN)
         {
-            print_err(con, "<%s:%d> FASTCGI_STDOUT Error revents=0x%02X: %s; id=%d\n", __func__, __LINE__, revents, resp->id);
+            print_err(resp, "<%s:%d> FASTCGI_STDOUT Error revents=0x%02X: %s; id=%d\n", __func__, __LINE__, revents, resp->id);
             create_message(resp, RS502);
             return;
         }
@@ -490,7 +488,7 @@ void EventHandlerClass::fcgi_worker(Connect* con, Response *resp, struct pollfd 
     }
 }
 //======================================================================
-void EventHandlerClass::fcgi_get_headers(Connect* con, Response *resp)
+void EventHandlerClass::fcgi_get_headers(Connect* con, Stream *resp)
 {
     const char *p1 = resp->html.ptr(), *p = NULL;
     for (int i = 0; i < resp->html.size(); ++i)

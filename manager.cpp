@@ -38,6 +38,7 @@ void EventHandlerClass::close_connect(Connect *r)
 {
     if (r->tls.ssl)
     {
+        //SSL_clear(r->tls.ssl);
         SSL_free(r->tls.ssl);
     }
 
@@ -64,32 +65,44 @@ void EventHandlerClass::ssl_shutdown(Connect *conn)
             (conn->tls.err != SSL_ERROR_SYSCALL))
         {
             conn->h2.type_op = SSL_SHUTDOWN;
-            int ret = SSL_shutdown(conn->tls.ssl);
-            if (ret == -1)
+            for ( int i = 0; i < 2; ++i)
             {
-                conn->tls.err = SSL_get_error(conn->tls.ssl, ret);
-                if (conn->tls.err == SSL_ERROR_ZERO_RETURN)
+                int ret = SSL_shutdown(conn->tls.ssl);
+                print_err(conn, "<%s:%d> SSL_shutdown()=%d\n", __func__, __LINE__, ret);
+                if (ret == -1)
                 {
-                    close_connect(conn);
-                    return;
+                    conn->tls.err = SSL_get_error(conn->tls.ssl, ret);
+                    if (conn->tls.err == SSL_ERROR_ZERO_RETURN)
+                    {
+                        close_connect(conn);
+                        return;
+                    }
+                    else if (conn->tls.err == SSL_ERROR_WANT_READ)
+                    {
+                        //print_err(conn, "<%s:%d> SSL_ERROR_WANT_READ\n", __func__, __LINE__);
+                        conn->tls.poll_event = POLLIN;
+                        conn->sock_timer = 0;
+                        return;
+                    }
+                    else if (conn->tls.err == SSL_ERROR_WANT_WRITE)
+                    {
+                        //print_err(conn, "<%s:%d> SSL_ERROR_WANT_WRITE\n", __func__, __LINE__);
+                        conn->tls.poll_event = POLLOUT;
+                        conn->sock_timer = 0;
+                        return;
+                    }
+                    else
+                    {
+                        print_err(conn, "<%s:%d> Error: %s\n", __func__, __LINE__, ssl_strerror(conn->tls.err));
+                        break;
+                    }
                 }
-                else if (conn->tls.err == SSL_ERROR_WANT_READ)
+                else if (ret == 0)
                 {
-                    conn->io_status = WAIT;
-                    conn->tls.poll_event = POLLIN;
-                    return;
+                    continue;
                 }
-                else if (conn->tls.err == SSL_ERROR_WANT_WRITE)
-                {
-                    conn->io_status = WAIT;
-                    conn->tls.poll_event = POLLOUT;
-                    return;
-                }
-            }
-            else if (ret == 0)
-            {
-                conn->io_status = WORK;
-                return;
+                else
+                    break;
             }
         }
         else
@@ -171,6 +184,7 @@ void manager(int sockServer)
             continue;
         }
 
+        req->numConn = ++allConn;
         req->h2.numConn = req->numConn;
 
         int flags = 1;
@@ -195,23 +209,22 @@ void manager(int sockServer)
             break;
         }
 
-        req->numConn = ++allConn;
-        req->numReq = 0;
+        req->h2.numReq = 0;
         req->serverSocket = sockServer;
         req->clientSocket = clientSocket;
 
         int err;
         if ((err = getnameinfo((struct sockaddr *)&clientAddr,
                 addrSize,
-                req->remoteAddr,
-                sizeof(req->remoteAddr),
-                req->remotePort,
-                sizeof(req->remotePort),
+                req->h2.remoteAddr,
+                sizeof(req->h2.remoteAddr),
+                req->h2.remotePort,
+                sizeof(req->h2.remotePort),
                 NI_NUMERICHOST | NI_NUMERICSERV)))
         {
             print_err(req, "<%s:%d> Error getnameinfo()=%d: %s\n", __func__, __LINE__, err, gai_strerror(err));
-            req->remoteAddr[0] = 0;
-            req->remotePort[0] = 0;
+            req->h2.remoteAddr[0] = 0;
+            req->h2.remotePort[0] = 0;
             shutdown(clientSocket, SHUT_RDWR);
             close(clientSocket);
             delete req;
@@ -243,6 +256,7 @@ void manager(int sockServer)
 
         req->tls.poll_event = POLLIN | POLLOUT;
         req->h2.type_op = SSL_ACCEPT;
+        req->h2.next = NULL;
         start_conn();
         push_pollin_list(req);
     }

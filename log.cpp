@@ -104,10 +104,15 @@ mtxLog.lock();
 mtxLog.unlock();
 }
 //======================================================================
-void print_err(Response *resp, const char *format, ...)
+void print_err(Stream *resp, const char *format, ...)
 {
     va_list ap;
     char buf[300];
+    if (!resp)
+    {
+        fprintf(stderr, "<%s:%d> !!! resp=NULL\n", __func__, __LINE__);
+        return;
+    }
 
     va_start(ap, format);
     vsnprintf(buf, sizeof(buf), format, ap);
@@ -129,20 +134,17 @@ mtxLog.lock();
 mtxLog.unlock();
 }
 //======================================================================
-void print_log(Connect *r, Response *resp)
+void print_log(Stream *resp)
 {
     String ss(320);
     if (resp)
     {
-        ss  << r->numConn << "/" << resp->numReq << " - " << r->remoteAddr << " - [" << log_time()
+        ss  << resp->numConn << "/" << resp->numReq << " - " << resp->remoteAddr << " - [" << log_time()
             << "] - \"" << resp->method.c_str() << " " << resp->decode_path.c_str() << " HTTP/2\" - "
-            << resp->status << " " << resp->send_bytes << " - \"" << resp->user_agent << "\" - id=" << resp->id << "\n";
+            << resp->status << " " << resp->send_bytes << " - \"" << resp->user_agent << "\" - id=" << resp->id << " \n";
     }
     else
-    {
-        ss << r->numConn << "/" << resp->numReq << " - " << r->remoteAddr << ":" << r->remotePort
-           << " - [" << log_time() << "] - Error resp=NULL\n";
-    }
+        return;
 
 mtxLog.lock();
     write(flog, ss.c_str(), ss.size());

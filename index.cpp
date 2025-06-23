@@ -76,7 +76,7 @@ int cmp(const void *a, const void *b)
     return i;
 }
 //======================================================================
-void create_index_html(Connect *r, char **list, int numFiles, string& path, Response *resp)
+void create_index_html(Connect *r, char **list, int numFiles, string& path, Stream *resp)
 {
     const int len_path = path.size();
     int n, i;
@@ -226,7 +226,7 @@ void create_index_html(Connect *r, char **list, int numFiles, string& path, Resp
     resp->send_cont_length = resp->html.size();
 }
 //======================================================================
-int index_dir(Connect *r, string& path, Response *resp)
+int index_dir(Connect *r, string& path, Stream *resp)
 {
     DIR *dir;
     struct dirent *dirbuf;

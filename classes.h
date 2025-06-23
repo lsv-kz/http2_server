@@ -34,19 +34,22 @@ enum FCGI_OPERATION { FASTCGI_BEGIN, FASTCGI_PARAMS, FASTCGI_STDIN, FASTCGI_STDO
 enum CGI_TYPE { CGI, PHPCGI, PHPFPM, FASTCGI, SCGI, };
 
 const int FRAME_DATA_READY = 0x01, FRAME_HEADERS_READY = 0x02, FRAME_WINUPDATE_CONNECT_READY = 0x04, FRAME_WINUPDATE_STREAM_READY = 0x08;
-const int FRAME_PING_READY = 0x10, FRAME_SETTINGS_READY = 0x20, RECV_FROM_CLIENT_WAIT = 0x40;
+const int FRAME_PING_READY = 0x10, FRAME_SETTINGS_READY = 0x20;
 
 extern const char *static_tab[][2];
 
 void print_err(const char *format, ...);
 //======================================================================
-struct Response
+struct Stream
 {
-    Response *prev;
-    Response *next;
-    
+    Stream *prev;
+    Stream *next;
+
     unsigned long numConn;
     unsigned long numReq;
+    
+    std::string remoteAddr;
+    std::string remotePort;
 
     int id;
     int len;
@@ -107,7 +110,6 @@ struct Response
         std::string query_string;
         pid_t pid;
 
-        int num_poll;
         // CGI, PHPCGI
         int to_script;
         int from_script;
@@ -132,7 +134,7 @@ struct Response
         long window_update;
     } cgi;
 
-    Response()
+    Stream()
     {
         numConn = numReq = 0;
         status = 0;
@@ -156,7 +158,7 @@ struct Response
         cgi.window_update = 0;
     }
 
-    ~Response()
+    ~Stream()
     {
         if ((send_bytes != file_size) && (content == REGFILE))
             print_err("<%s:%d> !!! ~Resp(%s), send_bytes != file_size, window_update=%ld, id=%d\n", __func__, __LINE__, uri, window_update, id);
@@ -184,8 +186,8 @@ struct Response
     }
 
 private:
-    Response(const Response&);
-    Response& operator=(const Response&);
+    Stream(const Stream&);
+    Stream& operator=(const Stream&);
 };
 //======================================================================
 class DynamicTable

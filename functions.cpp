@@ -412,7 +412,7 @@ long long file_size(const char *s)
         return -1;
 }
 //======================================================================
-void set_frame(Response *resp, char *s, int len, int type, HTTP2_FLAGS flags, int id)
+void set_frame(Stream *resp, char *s, int len, int type, HTTP2_FLAGS flags, int id)
 {
     s[0] = (len>>16) & 0xff;
     s[1] = (len>>8) & 0xff;
@@ -432,7 +432,7 @@ void set_frame(Response *resp, char *s, int len, int type, HTTP2_FLAGS flags, in
         resp->send_ready |= FRAME_DATA_READY;
 }
 //======================================================================
-void set_frame_headers(Response *resp)
+void set_frame_headers(Stream *resp)
 {
     int id = resp->id;
     resp->headers.cpy("\0\0\0\1\4\0\0\0\0", 9);
@@ -449,7 +449,7 @@ void set_frame_headers(Response *resp)
     resp->send_ready |= FRAME_HEADERS_READY;
 }
 //======================================================================
-void add_header(Response *resp, int ind)
+void add_header(Stream *resp, int ind)
 {
     if ((ind >= 8) && (ind <= 14))
         resp->status = atoi(static_tab[ind][1]);
@@ -462,7 +462,7 @@ void add_header(Response *resp, int ind)
     resp->headers.set_byte(len & 0xff, 2);
 }
 //======================================================================
-void add_header(Response *resp, int ind, const char *val)
+void add_header(Stream *resp, int ind, const char *val)
 {
     if ((ind >= 8) && (ind <= 14))
         resp->status = atoi(val);
@@ -478,7 +478,7 @@ void add_header(Response *resp, int ind, const char *val)
     resp->headers.set_byte(len & 0xff, 2);
 }
 //======================================================================
-void set_frame_window_update(Response *resp, int len)
+void set_frame_window_update(Stream *resp, int len)
 {
     int id = resp->id;
     char s[] = "\x00\x00\x04\x08\x00\x00\x00\x00\x00"  // 0-8
@@ -486,7 +486,7 @@ void set_frame_window_update(Response *resp, int len)
 
     resp->frame_win_update.cpy(s, 13);
 
-    resp->frame_win_update.set_byte((len>>24) & 0xff, 9);
+    resp->frame_win_update.set_byte((len>>24) & 0x7f, 9);
     resp->frame_win_update.set_byte((len>>16) & 0xff, 10);
     resp->frame_win_update.set_byte((len>>8) & 0xff, 11);
     resp->frame_win_update.set_byte(len & 0xff, 12);
@@ -504,7 +504,7 @@ void set_frame_window_update(Connect *con, int len)
     con->h2.frame_win_update.cpy("\x00\x00\x04\x08\x00\x00\x00\x00\x00"  // 0-8
                                "\x00\x00\x00\x00", 13);              // 9-12
 
-    con->h2.frame_win_update.set_byte((len>>24) & 0xff, 9);
+    con->h2.frame_win_update.set_byte((len>>24) & 0x7f, 9);
     con->h2.frame_win_update.set_byte((len>>16) & 0xff, 10);
     con->h2.frame_win_update.set_byte((len>>8) & 0xff, 11);
     con->h2.frame_win_update.set_byte(len & 0xff, 12);
@@ -530,7 +530,7 @@ int send_rst_stream(Connect *c, int id)
     return 0;
 }
 //======================================================================
-void set_frame_data(Response *resp, int len, int flag)
+void set_frame_data(Stream *resp, int len, int flag)
 {
     int id = resp->id;
     resp->data.cpy("\0\0\0\0\0\0\0\0\0", 9);
@@ -547,7 +547,7 @@ void set_frame_data(Response *resp, int len, int flag)
     resp->send_ready |= FRAME_DATA_READY;
 }
 //======================================================================
-int set_frame_data(Connect *con, Response *resp)
+int set_frame_data(Connect *con, Stream *resp)
 {
     if (resp->content == DYN_PAGE)
     {
@@ -580,6 +580,7 @@ int set_frame_data(Connect *con, Response *resp)
         long win_update = (con->h2.window_update > resp->window_update) ? resp->window_update : con->h2.window_update;
         if (win_update <= 0)
         {
+            print_err(con, "<%s:%d> !!! h2.window_update=%ld, resp->window_update=%ld, id=%d\n", __func__, __LINE__, con->h2.window_update, resp->window_update, resp->id);
             return 0;
         }
 
@@ -606,7 +607,7 @@ int set_frame_data(Connect *con, Response *resp)
             int n = read(resp->fd, buf, data_len);
             if (n <= 0)
             {
-                print_err(con, "<%s:%d> Error read(fd=%d)=%d: %s, id=%d\n", __func__, __LINE__, resp->fd, n, strerror(errno), resp->id);
+                print_err(con, "<%s:%d> Error read(fd=%d)=%d: %s, id=%d \n", __func__, __LINE__, resp->fd, n, strerror(errno), resp->id);
                 close(resp->fd);
                 resp->fd = -1;
                 return -1;
@@ -655,7 +656,7 @@ int set_frame_data(Connect *con, Response *resp)
     return 1;
 }
 //======================================================================
-int set_response(Connect *con, Response *resp)
+int set_response(Connect *con, Stream *resp)
 {
     resp->send_bytes = 0;
 
@@ -847,26 +848,14 @@ int set_response(Connect *con, Response *resp)
         resp->data.init();
         resp->cgi.op = CGI_CREATE;
         resp->status = RS200;
-        if (resp->method == "POST")
-        {
-            if (con->h2.server_window_size < conf->DataBufSize)
-                set_frame_window_update(con, conf->DataBufSize - con->h2.server_window_size);
-            set_frame_window_update(resp, conf->DataBufSize);
-        }
     }
     else
     {
-        if (iscgi(con, resp))
+        if (iscgi(resp))
         {
             resp->data.init();
             resp->cgi.op = CGI_CREATE;
             resp->status = RS200;
-            if (resp->method == "POST")
-            {
-                if (con->h2.server_window_size < conf->DataBufSize)
-                    set_frame_window_update(con, conf->DataBufSize - con->h2.server_window_size);
-                set_frame_window_update(resp, conf->DataBufSize);
-            }
         }
         else
         {
@@ -930,8 +919,9 @@ int parse_range(const char *s, long long file_size, long long *offset, long long
     return 0;
 }
 //======================================================================
-void resp_200(Response *resp)
+void resp_200(Stream *resp)
 {
+    resp->content = ERROR_TYPE;
     if (resp->send_headers == false)
     {
         set_frame_headers(resp);
@@ -948,8 +938,9 @@ void resp_200(Response *resp)
     resp->data.cat(err, len);
 }
 //======================================================================
-void resp_204(Response *resp)
+void resp_204(Stream *resp)
 {
+    resp->content = ERROR_TYPE;
     set_frame_headers(resp);
     add_header(resp, 8, "204");
     add_header(resp, 33, get_time().c_str());
@@ -960,8 +951,9 @@ void resp_204(Response *resp)
     set_frame_data(resp, 0, FLAG_END_STREAM);
 }
 //======================================================================
-void resp_400(Response *resp)
+void resp_400(Stream *resp)
 {
+    resp->content = ERROR_TYPE;
     if (resp->send_headers == false)
     {
         set_frame_headers(resp);
@@ -978,8 +970,9 @@ void resp_400(Response *resp)
     resp->data.cat(err, len);
 }
 //======================================================================
-void resp_403(Response *resp)
+void resp_403(Stream *resp)
 {
+    resp->content = ERROR_TYPE;
     if (resp->send_headers == false)
     {
         set_frame_headers(resp);
@@ -996,8 +989,9 @@ void resp_403(Response *resp)
     resp->data.cat(err, len);
 }
 //======================================================================
-void resp_404(Response *resp)
+void resp_404(Stream *resp)
 {
+    resp->content = ERROR_TYPE;
     if (resp->send_headers == false)
     {
         set_frame_headers(resp);
@@ -1014,8 +1008,9 @@ void resp_404(Response *resp)
     resp->data.cat(err, len);
 }
 //======================================================================
-void resp_411(Response *resp)
+void resp_411(Stream *resp)
 {
+    resp->content = ERROR_TYPE;
     if (resp->send_headers == false)
     {
         set_frame_headers(resp);
@@ -1032,8 +1027,9 @@ void resp_411(Response *resp)
     resp->data.cat(err, len);
 }
 //======================================================================
-void resp_413(Response *resp)
+void resp_413(Stream *resp)
 {
+    resp->content = ERROR_TYPE;
     if (resp->send_headers == false)
     {
         set_frame_headers(resp);
@@ -1050,8 +1046,9 @@ void resp_413(Response *resp)
     resp->data.cat(err, len);
 }
 //======================================================================
-void resp_500(Response *resp)
+void resp_500(Stream *resp)
 {
+    resp->content = ERROR_TYPE;
     if (resp->send_headers == false)
     {
         set_frame_headers(resp);
@@ -1068,8 +1065,9 @@ void resp_500(Response *resp)
     resp->data.cat(err, len);
 }
 //======================================================================
-void resp_502(Response *resp)
+void resp_502(Stream *resp)
 {
+    resp->content = ERROR_TYPE;
     if (resp->send_headers == false)
     {
         set_frame_headers(resp);
@@ -1086,8 +1084,9 @@ void resp_502(Response *resp)
     resp->data.cat(err, len);
 }
 //======================================================================
-void resp_504(Response *resp)
+void resp_504(Stream *resp)
 {
+    resp->content = ERROR_TYPE;
     if (resp->send_headers == false)
     {
         set_frame_headers(resp);
@@ -1162,4 +1161,27 @@ const char *status_resp(int st)
             return "500";
     }
     return "";
+}
+//======================================================================
+void hex_print_stderr(const char *s, int line, const void *p, int n)
+{
+    int count, addr = 0, col;
+    unsigned char *buf = (unsigned char*)p;
+    char str[18];
+    fprintf(stderr, "<%s:%d>--------------------------------\n", s, line);
+    for(count = 0; count < n;)
+    {
+        fprintf(stderr, "%08X  ", addr);
+        for(col = 0, addr = addr + 0x10; (count < n) && (col < 16); count++, col++)
+        {
+            if (col == 8) fprintf(stderr, " ");
+            fprintf(stderr, "%02X ", *(buf+count));
+            str[col] = (*(buf + count) >= 32 && *(buf + count) < 127) ? *(buf + count) : '.';
+        }
+        str[col] = 0;
+        if (col <= 8) fprintf(stderr, " ");
+        fprintf(stderr, "%*s  %s\n",(16 - (col)) * 3, "", str);
+    }
+
+    //fprintf(stderr, "\n");
 }
