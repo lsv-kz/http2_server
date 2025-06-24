@@ -39,6 +39,12 @@ int EventHandlerClass::http2_worker_connections(Connect *con)
     }
     else if (con->h2.type_op == SEND_SETTINGS)
     {
+        if (con->h2.settings.size_remain() == 0)
+        {
+            print_err(con, "<%s:%d> !!! SEND_SETTINGS Error: settings.size_remain() == 0\n", __func__, __LINE__);
+            return 0;
+        }
+
         int ret = write_to_client(con, con->h2.settings.ptr_remain(), con->h2.settings.size_remain(), 0);
         if (ret <= 0)
         {
@@ -48,13 +54,17 @@ int EventHandlerClass::http2_worker_connections(Connect *con)
             ssl_shutdown(con);
             return -1;
         }
-
+hex_print_stderr("send SETTINGS", __LINE__, con->h2.settings.ptr_remain(), con->h2.settings.size_remain());
         con->h2.settings.set_offset(ret);
 
         if (con->h2.settings.size_remain() == 0)
         {
             con->sock_timer = 0;
-            con->h2.type_op = WORK_STREAM;
+            con->h2.settings.init();
+            if (con->h2.ack_recv)
+                con->h2.type_op = WORK_STREAM;
+            else
+                con->h2.type_op = RECV_SETTINGS;
         }
     }
     else if (con->h2.type_op == SSL_ACCEPT)
@@ -135,7 +145,7 @@ int EventHandlerClass::http2_worker_connections(Connect *con)
         }
         return 0;
     }
-    else if (con->h2.type_op == WORK_STREAM)
+    else if ((con->h2.type_op == WORK_STREAM) || (con->h2.type_op == RECV_SETTINGS))
     {
         if ((con->fd_revents & POLLIN) || con->ssl_pending)
         {
@@ -317,7 +327,7 @@ int EventHandlerClass::recv_from_client(Connect *con)
             ((unsigned char)con->h2.header[7]<<8) + (unsigned char)con->h2.header[8];
         con->sock_timer = 0;
         con->h2.init();
-//hex_print_stderr(__func__, con->h2.id, con->h2.header, 9);
+//hex_print_stderr(__func__, __LINE__, con->h2.header, 9);
         char buf[con->h2.body_len];
         if (con->h2.body_len > 0)
         {
@@ -344,6 +354,8 @@ int EventHandlerClass::recv_from_client(Connect *con)
 
         if (con->h2.type == SETTINGS)
         {
+            hex_print_stderr("recv SETTINGS", __LINE__, con->h2.header, 9);
+            hex_print_stderr("recv SETTINGS", __LINE__, con->h2.body.ptr(), con->h2.body.size());
             for (int i = 0; i < (con->h2.body_len/6); ++i)
             {
                 int ind = i * 6;
@@ -359,7 +371,14 @@ int EventHandlerClass::recv_from_client(Connect *con)
 
             if (con->h2.header[4] == FLAG_ACK)
             {
+                print_err(con, "<%s:%d> recv SETTINGS flag=ACK\n", __func__, __LINE__);
                 con->h2.ack_recv = true;
+                con->h2.type_op = WORK_STREAM;
+            }
+            else
+            {
+                con->h2.settings.cat("\x00\x00\x00\x04\x01\x00\x00\x00\x00", 9);
+                con->h2.type_op = SEND_SETTINGS;
             }
         }
         else if (con->h2.type == DATA)
@@ -399,7 +418,8 @@ int EventHandlerClass::recv_from_client(Connect *con)
             }
             else
                 p_buf = buf;
-
+            if (con->h2.body_len < 100)
+                print_err(resp, "<%s:%d> +++ DATA %d, con.serv_wind_size=%ld, stream.wind_update=%ld, id=%d \n", __func__, __LINE__, con->h2.body_len, con->h2.server_window_size, resp->cgi.window_update, resp->id);
             con->h2.server_window_size += con->h2.body_len;
             resp->cgi.window_update += con->h2.body_len;
 

@@ -70,7 +70,7 @@ enum {
     M_PATCH, M_DELETE, M_TRACE, M_CONNECT
 };
 
-enum OPERATION_HTTP2 { SSL_ACCEPT = 1, PREFACE_MESSAGE, SEND_SETTINGS, WORK_STREAM, SSL_SHUTDOWN, };
+enum OPERATION_HTTP2 { SSL_ACCEPT = 1, PREFACE_MESSAGE, RECV_SETTINGS, SEND_SETTINGS, WORK_STREAM, SSL_SHUTDOWN, };
 
 enum DIRECT { TIME_OUT, FROM_CLIENT, TO_CLIENT };
 
@@ -260,8 +260,6 @@ struct http2
         settings.set_byte((conf->MaxConcurrentStreams>>16) & 0xff, 18);
         settings.set_byte((conf->MaxConcurrentStreams>>8) & 0xff, 19);
         settings.set_byte(conf->MaxConcurrentStreams & 0xff, 20);
-
-        settings.cat("\x00\x00\x00\x04\x01\x00\x00\x00\x00", 9);
     }
 
     ~http2()

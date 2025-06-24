@@ -154,6 +154,8 @@ const char *get_str_operation(OPERATION_HTTP2 n)
             return "SSL_ACCEPT";
         case PREFACE_MESSAGE:
             return "PREFACE_MESSAGE";
+        case RECV_SETTINGS:
+            return "RECV_SETTINGS";
         case SEND_SETTINGS:
             return "SEND_SETTINGS";
         case WORK_STREAM:

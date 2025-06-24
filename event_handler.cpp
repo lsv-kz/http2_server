@@ -396,6 +396,7 @@ int EventHandlerClass::set_poll()
 {
     num_wait = 0;
     time_t t = time(NULL);
+    int Timeout = 0;
     Connect *c = work_list_start, *next = NULL;
     for ( ; c; c = next)
     {
@@ -404,51 +405,63 @@ int EventHandlerClass::set_poll()
         if (c->sock_timer == 0)
             c->sock_timer = t;
 
-        c->ssl_pending = SSL_pending(c->tls.ssl);
+        if ((c->h2.type_op == PREFACE_MESSAGE) ||
+                (c->h2.type_op == SSL_ACCEPT) ||
+                (c->h2.type_op == SSL_SHUTDOWN) ||
+                (c->h2.type_op == RECV_SETTINGS) ||
+                (c->h2.type_op == SEND_SETTINGS)
+        )
+        {
+            Timeout = 5;
+        }
+        else
+            Timeout = conf->Timeout;
 
-        if ((t - c->sock_timer) >= conf->Timeout)
+        if ((t - c->sock_timer) >= Timeout)
         {
             print_err(c, "<%s:%d> Timeout=%ld, %s\n", __func__, __LINE__, t - c->sock_timer, get_str_operation(c->h2.type_op));
             if ((c->h2.type_op == SSL_ACCEPT) || 
-                (c->h2.type_op == SSL_SHUTDOWN))
-            {
+                (c->h2.type_op == SSL_SHUTDOWN)
+            )
                 close_connect(c);
-            }
             else
-            {
                 ssl_shutdown(c);
-            }
         }
         else
         {
-            while (c->ssl_pending)
+            while ((c->ssl_pending = SSL_pending(c->tls.ssl)) && (c->h2.type_op != SEND_SETTINGS))
             {
                 //print_err(c, "<%s:%d> ***** SSL_pending()=%d, %s\n", __func__, __LINE__, c->ssl_pending, get_str_operation(c->h2.type_op));
                 http2_worker_connections(c);
-                c->ssl_pending = SSL_pending(c->tls.ssl);
             }
 
             if ((c->h2.type_op == PREFACE_MESSAGE) ||
                 (c->h2.type_op == SSL_ACCEPT) ||
                 (c->h2.type_op == SSL_SHUTDOWN) ||
-                (c->h2.type_op == SEND_SETTINGS)
+                (c->h2.type_op == RECV_SETTINGS)
             )
             {
                 poll_fd[num_wait].fd = c->clientSocket;
-                poll_fd[num_wait].events = 0;
 
                 if (c->h2.type_op == PREFACE_MESSAGE)
                     poll_fd[num_wait].events = POLLIN;
                 else if ((c->h2.type_op == SSL_ACCEPT) || (c->h2.type_op == SSL_SHUTDOWN))
                     poll_fd[num_wait].events = c->tls.poll_event;
-                else if (c->h2.type_op == SEND_SETTINGS)
-                    poll_fd[num_wait].events = POLLOUT | POLLIN;
+                else if (c->h2.type_op == RECV_SETTINGS)
+                    poll_fd[num_wait].events = POLLIN;
                 else
                 {
                     print_err(c, "<%s:%d> *********Error********** c->h2.type_op=%d\n", __func__, __LINE__, c->h2.type_op);
                     exit(7);
                 }
 
+                conn_array[num_wait++] = c;
+            }
+            else if (c->h2.type_op == SEND_SETTINGS)
+            {
+                //print_err(c, "<%s:%d> SEND_SETTINGS(+POLLOUT) c->h2.settings.size()=%d\n", __func__, __LINE__, c->h2.settings.size());
+                poll_fd[num_wait].fd = c->clientSocket;
+                poll_fd[num_wait].events = POLLOUT;
                 conn_array[num_wait++] = c;
             }
             else // h2.type_op = WORK_STREAM
@@ -526,29 +539,10 @@ int EventHandlerClass::poll_worker()
     {
         Connect *con = conn_array[conn_ind];
 
-        if ((con->h2.type_op == PREFACE_MESSAGE) ||
-            (con->h2.type_op == SSL_ACCEPT) ||
-            (con->h2.type_op == SSL_SHUTDOWN) ||
-            (con->h2.type_op == SEND_SETTINGS)
-        )
-        {
-            if (poll_fd[conn_ind].revents & (POLLIN | POLLOUT))
-                http2_worker_connections(con);
-            continue;
-        }
-
         int revents = poll_fd[conn_ind].revents;
-        int fd = poll_fd[conn_ind].fd;
-
-        if (fd != con->clientSocket)
-        {
-            print_err(con, "<%s:%d> !!! Error: fd=%d/clientSocket=%d\n", __func__, __LINE__, fd, con->clientSocket);
-            exit(2);
-        }
-
         if (revents & ((~POLLIN) & (~POLLOUT)))
         {
-            print_err(con, "<%s:%d> !!! Error: fd=%d, revents=0x%02x, type_op=%d\n", __func__, __LINE__, fd, revents, con->h2.type_op);
+            print_err(con, "<%s:%d> !!! Error: revents=0x%02x, type_op=%d\n", __func__, __LINE__, revents, con->h2.type_op);
             if ((con->h2.type_op == SSL_ACCEPT) || 
                 (con->h2.type_op == SSL_SHUTDOWN))
             {
@@ -556,9 +550,44 @@ int EventHandlerClass::poll_worker()
             }
             else
                 ssl_shutdown(con);
+            continue;
+        }
+
+        if ((con->h2.type_op == PREFACE_MESSAGE) ||
+            (con->h2.type_op == SSL_ACCEPT) ||
+            (con->h2.type_op == SSL_SHUTDOWN) ||
+            (con->h2.type_op == RECV_SETTINGS)
+        )
+        {
+            if (con->h2.type_op == RECV_SETTINGS)
+            {
+                if (poll_fd[conn_ind].revents & POLLIN)
+                {
+                    print_err(con, "<%s:%d> RECV_SETTINGS (POLLIN)\n", __func__, __LINE__);
+                    if (recv_from_client(con) < 0)
+                    {
+                        ssl_shutdown(con);
+                        continue;
+                    }
+                }
+            }
+            else if (poll_fd[conn_ind].revents & (POLLIN | POLLOUT))
+                http2_worker_connections(con);
+        }
+        else if (con->h2.type_op == SEND_SETTINGS)
+        {
+            http2_worker_connections(con);
         }
         else
         {
+            int fd = poll_fd[conn_ind].fd;
+
+            if (fd != con->clientSocket)
+            {
+                print_err(con, "<%s:%d> !!! Error: fd=%d/clientSocket=%d\n", __func__, __LINE__, fd, con->clientSocket);
+                exit(2);
+            }
+
             if (revents & POLLIN)
             {
                 con->fd_revents = POLLIN;
