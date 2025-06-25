@@ -92,86 +92,6 @@ enum DIRECT { TIME_OUT, FROM_CLIENT, TO_CLIENT };
 #define FCGI_UNKNOWN_TYPE       11
 #define FCGI_MAXTYPE            (FCGI_UNKNOWN_TYPE)
 #define requestId               1
-//----------------------------------------------------------------------
-typedef struct fcgi_list_addr
-{
-    std::string script_name;
-    std::string addr;
-    CGI_TYPE type;
-    struct fcgi_list_addr *next;
-} fcgi_list_addr;
-//----------------------------------------------------------------------
-class Config
-{
-    Config(const Config&){}
-    Config& operator=(const Config&);
-
-public:
-
-    SSL_CTX *ctx;
-
-    std::string ServerSoftware;
-
-    std::string ServerAddr;
-    std::string ServerPort;
-
-    std::string DocumentRoot;
-    std::string ScriptPath;
-    std::string LogPath;
-    std::string PidFilePath;
-
-    std::string UsePHP;
-    std::string PathPHP;
-
-    int MaxConcurrentStreams;
-
-    int ListenBacklog;
-    char TcpNoDelay;
-
-    int DataBufSize;
-
-    int MaxAcceptConnections;
-
-    int MaxCgiProc;
-
-    int Timeout;
-    int TimeoutPoll;
-    int TimeoutCGI;
-
-    long int ClientMaxBodySize;
-
-    char ShowMediaFiles;
-
-    std::string user;
-    std::string group;
-
-    uid_t server_uid;
-    gid_t server_gid;
-
-    fcgi_list_addr *fcgi_list;
-    //------------------------------------------------------------------
-    Config()
-    {
-        fcgi_list = NULL;
-    }
-
-    ~Config()
-    {
-        free_fcgi_list();
-    }
-
-    void free_fcgi_list()
-    {
-        fcgi_list_addr *t;
-        while (fcgi_list)
-        {
-            t = fcgi_list;
-            fcgi_list = fcgi_list->next;
-            if (t)
-                delete t;
-        }
-    }
-};
 //======================================================================
 extern const Config* const conf;
 //======================================================================
@@ -341,7 +261,7 @@ class EventHandlerClass
     void worker(Connect *c);
 
     int http2_worker_connections(Connect *c);
-    int http2_worker_streams(Connect *c);
+    void http2_worker_streams(Connect *c);
 
     int send_html(Connect *c);
     int recv_from_client(Connect *c);

@@ -36,7 +36,8 @@ static int select_alpn(const unsigned char **out, unsigned char *outlen,
         {
             *out = (unsigned char *)&in[i + 1];
             *outlen = in[i];
-            hex_print_stderr(__func__, __LINE__, &in[i + 1], in[i]);
+            if (conf->PrintDebugMsg == 'y')
+                hex_print_stderr(__func__, __LINE__, &in[i + 1], in[i]);
             return 0;
         }
         else
@@ -64,7 +65,8 @@ static int alpn_select_proto_cb(SSL *ssl, const unsigned char **out,
                                 unsigned char *outlen, const unsigned char *in,
                                 unsigned int inlen, void *arg)
 {
-    hex_print_stderr(__func__, __LINE__, in, inlen);
+    if (conf->PrintDebugMsg == 'y')
+        hex_print_stderr(__func__, __LINE__, in, inlen);
     int rv = select_next_protocol((unsigned char **)out, outlen, in, inlen);
     if (rv == 0)
     {
@@ -152,7 +154,8 @@ int ssl_read(Connect *con, char *buf, int len)
         con->tls.err = SSL_get_error(con->tls.ssl, ret);
         if (con->tls.err == SSL_ERROR_ZERO_RETURN)
         {
-            //print_err(con, "<%s:%d> Error SSL_read(): SSL_ERROR_ZERO_RETURN\n", __func__, __LINE__);
+            if (conf->PrintDebugMsg == 'y')
+                print_err(con, "<%s:%d> Error SSL_read(): SSL_ERROR_ZERO_RETURN\n", __func__, __LINE__);
             return 0;
         }
         else if (con->tls.err == SSL_ERROR_WANT_READ)
@@ -173,20 +176,17 @@ int ssl_read(Connect *con, char *buf, int len)
         }
     }
     else
-    {
-        /*int pend = SSL_pending(con->tls.ssl);
-        if (pend)
-            con->io_status = WORK;
-        else
-            con->io_status = WAIT;*/
-
         return ret;
-    }
 }
 //======================================================================
 int ssl_write(Connect *con, const char *buf, int len, int id)
 {
     ERR_clear_error();
+    if ((con == NULL) || (buf == NULL) || (len <= 0) || (len > (conf->DataBufSize + 9)))
+    {
+		print_err("<%s:%d> ??? Error conn=%p, buf=%p, len=%d\n", __func__, __LINE__, con, buf, len);
+		return -1;
+	}
 
     int ret = SSL_write(con->tls.ssl, buf, len);
     if (ret <= 0)
@@ -207,8 +207,6 @@ int ssl_write(Connect *con, const char *buf, int len, int id)
                     buf, len, ret, ssl_strerror(con->tls.err), errno, id);
         return -1;
     }
-    else
-    {
-        return ret;
-    }
+
+    return ret;
 }

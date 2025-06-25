@@ -69,7 +69,7 @@ void print_err(const char *format, ...)
 mtxLog.lock();
     write(flog_err, ss.c_str(), ss.size());
     num_logerr_records++;
-    if (num_logerr_records > 100000)
+    if (num_logerr_records > 500000)
     {
         exit(1);
         close(flog_err);
@@ -94,7 +94,7 @@ void print_err(Connect *req, const char *format, ...)
 mtxLog.lock();
     write(flog_err, ss.c_str(), ss.size());
     num_logerr_records++;
-    if (num_logerr_records > 100000)
+    if (num_logerr_records > 500000)
     {
         exit(1);
         close(flog_err);
@@ -124,7 +124,7 @@ void print_err(Stream *resp, const char *format, ...)
 mtxLog.lock();
     write(flog_err, ss.c_str(), ss.size());
     num_logerr_records++;
-    if (num_logerr_records > 100000)
+    if (num_logerr_records > 500000)
     {
         exit(1);
         close(flog_err);
@@ -149,9 +149,8 @@ void print_log(Stream *resp)
 mtxLog.lock();
     write(flog, ss.c_str(), ss.size());
     num_log_records++;
-    if (num_log_records > 100000)
+    if (num_log_records > 500000)
     {
-        exit(1);
         close(flog);
         create_logfile(conf->LogPath);
         num_log_records = 0;

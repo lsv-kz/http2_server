@@ -340,7 +340,8 @@ int EventHandlerClass::cgi_set_poll()
             int revents = poll_fd[poll_ind].revents;
             if ((fd != resp->cgi.to_script) && (fd != resp->cgi.from_script) && (fd != resp->cgi.fd))
             {
-                //print_err("<%s:%d> revents=0x%02X, fd=%d (fd != cgi.fd),  id=%d\n", __func__, __LINE__, revents, fd, resp->id);
+                if (conf->PrintDebugMsg == 'y')
+                    print_err("<%s:%d> revents=0x%02X, fd=%d (fd != cgi.fd),  id=%d\n", __func__, __LINE__, revents, fd, resp->id);
                 continue;
             }
 
@@ -383,7 +384,10 @@ int EventHandlerClass::cgi_set_poll()
                 }
             }
             else
-                print_err("<%s:%d> revents=0, id=%d \n", __func__, __LINE__, resp->id);
+            {
+                if (conf->PrintDebugMsg == 'y')
+                    print_err("<%s:%d> revents=0, id=%d \n", __func__, __LINE__, resp->id);
+            }
 
             poll_ind++;
         }
@@ -412,10 +416,10 @@ int EventHandlerClass::set_poll()
                 (c->h2.type_op == SEND_SETTINGS)
         )
         {
-            Timeout = 5;
+            Timeout = conf->Timeout;
         }
         else
-            Timeout = conf->Timeout;
+            Timeout = conf->TimeoutKeepAlive;
 
         if ((t - c->sock_timer) >= Timeout)
         {
@@ -431,7 +435,12 @@ int EventHandlerClass::set_poll()
         {
             while ((c->ssl_pending = SSL_pending(c->tls.ssl)) && (c->h2.type_op != SEND_SETTINGS))
             {
-                //print_err(c, "<%s:%d> ***** SSL_pending()=%d, %s\n", __func__, __LINE__, c->ssl_pending, get_str_operation(c->h2.type_op));
+                if (conf->PrintDebugMsg == 'y')
+                {
+                    print_err(c, "<%s:%d> ***** SSL_pending()=%d, %s\n", __func__, __LINE__, 
+                                c->ssl_pending, get_str_operation(c->h2.type_op));
+                }
+
                 http2_worker_connections(c);
             }
 
@@ -459,7 +468,6 @@ int EventHandlerClass::set_poll()
             }
             else if (c->h2.type_op == SEND_SETTINGS)
             {
-                //print_err(c, "<%s:%d> SEND_SETTINGS(+POLLOUT) c->h2.settings.size()=%d\n", __func__, __LINE__, c->h2.settings.size());
                 poll_fd[num_wait].fd = c->clientSocket;
                 poll_fd[num_wait].events = POLLOUT;
                 conn_array[num_wait++] = c;
@@ -473,7 +481,8 @@ int EventHandlerClass::set_poll()
 
                 if (c->h2.window_update <= 0)
                 {
-                    //print_err(c, "<%s:%d> h2.window_update <= 0\n", __func__, __LINE__);
+                    if (conf->PrintDebugMsg == 'y')
+                        print_err(c, "<%s:%d> h2.window_update <= 0\n", __func__, __LINE__);
                     conn_array[num_wait++] = c;
                     poll_fd[num_wait].events = POLLIN;
                     continue;
@@ -563,7 +572,6 @@ int EventHandlerClass::poll_worker()
             {
                 if (poll_fd[conn_ind].revents & POLLIN)
                 {
-                    print_err(con, "<%s:%d> RECV_SETTINGS (POLLIN)\n", __func__, __LINE__);
                     if (recv_from_client(con) < 0)
                     {
                         ssl_shutdown(con);
@@ -581,22 +589,21 @@ int EventHandlerClass::poll_worker()
         else
         {
             int fd = poll_fd[conn_ind].fd;
-
             if (fd != con->clientSocket)
             {
                 print_err(con, "<%s:%d> !!! Error: fd=%d/clientSocket=%d\n", __func__, __LINE__, fd, con->clientSocket);
-                exit(2);
+                ssl_shutdown(con);
+                continue;
             }
 
-            if (revents & POLLIN)
+            if (poll_fd[conn_ind].revents & POLLIN)
             {
                 con->fd_revents = POLLIN;
                 http2_worker_connections(con);
             }
 
-            if (revents & POLLOUT)
+            if (poll_fd[conn_ind].revents & POLLOUT)
             {
-                con->fd_revents = POLLOUT;
                 http2_worker_streams(con);
             }
         }

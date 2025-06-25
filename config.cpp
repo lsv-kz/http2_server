@@ -47,6 +47,7 @@ void create_conf_file(const char *path)
         exit(1);
     }
 
+    fprintf(f, "PrintDebugMsg        n\n");
     fprintf(f, "ServerSoftware       ?\n");
     fprintf(f, "ServerAddr           0.0.0.0\n");
     fprintf(f, "ServerPort           8080\n\n");
@@ -65,7 +66,8 @@ void create_conf_file(const char *path)
 
     fprintf(f, "MaxCgiProc           15\n\n");
 
-    fprintf(f, "Timeout              120 # seconds\n");
+    fprintf(f, "Timeout              35  # seconds\n");
+    fprintf(f, "TimeoutKeepAlive     180 # seconds\n");
     fprintf(f, "TimeoutCGI           15  # seconds\n");
     fprintf(f, "TimeoutPoll          100 # milliseconds\n\n");
 
@@ -256,7 +258,9 @@ int read_conf_file(FILE *fconf)
             ss >> s1;
             ss >> s2;
 
-            if (s1 ==  "ServerAddr")
+            if ((s1 == "PrintDebugMsg") && is_bool(s2.c_str()))
+                c.PrintDebugMsg = (char)tolower(s2[0]);
+            else if (s1 ==  "ServerAddr")
                 s2 >> c.ServerAddr;
             else if (s1 == "ServerPort")
                 s2 >> c.ServerPort;
@@ -286,6 +290,8 @@ int read_conf_file(FILE *fconf)
                 s2 >> c.MaxCgiProc;
             else if ((s1 == "Timeout") && is_number(s2.c_str()))
                 s2 >> c.Timeout;
+            else if ((s1 == "TimeoutKeepAlive") && is_number(s2.c_str()))
+                s2 >> c.TimeoutKeepAlive;
             else if ((s1 == "TimeoutCGI") && is_number(s2.c_str()))
                 s2 >> c.TimeoutCGI;
             else if (s1 == "UsePHP")

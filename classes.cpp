@@ -89,15 +89,19 @@ int http2::close_stream(http2 *h2, int id, int *num_cgi)
         {
             if (h2->next == r)
             {
-                print_err("<%s:%d> !!!!! h2->next == r\n", __func__, __LINE__);
+                //print_err("<%s:%d> !!!!! h2->next == r(%p)\n", __func__, __LINE__, next);
                 h2->next = next;
             }
 
             if (r->cgi.start)
             {
-                print_err("<%s:%d>~~~~~~~ close cgi stream, id=%d \n", __func__, __LINE__, r->id);
+                if (conf->PrintDebugMsg == 'y')
+                    print_err("<%s:%d>~~~~~~~ close cgi stream, id=%d \n", __func__, __LINE__, r->id);
                 if (*num_cgi <= 0)
-                    print_err("<%s:%d>~~~~~~~ Error: *num_cgi=%d, id=%d \n", __func__, __LINE__, *num_cgi, r->id);
+                {
+                    if (conf->PrintDebugMsg == 'y')
+                        print_err("<%s:%d>~~~~~~~ Error: *num_cgi=%d, id=%d \n", __func__, __LINE__, *num_cgi, r->id);
+                }
                 else
                     (*num_cgi)--;
                 if (r->cgi.cgi_type <= PHPCGI)
@@ -494,7 +498,11 @@ int http2::parse(Stream *r)
         else if (name == "referer")
             r->referer = val;
         else if (name == "range")
+        {
+            if (conf->PrintDebugMsg == 'y')
+                fprintf(stderr, "<%s:%d> [%s: %s]\n", __func__, __LINE__, name.c_str(), val.c_str());
             r->range = val;
+        }
         else if (name == "authority")
             r->authority = val;
         else if (name == "content-length")

@@ -40,6 +40,90 @@ extern const char *static_tab[][2];
 
 void print_err(const char *format, ...);
 //======================================================================
+typedef struct fcgi_list_addr
+{
+    std::string script_name;
+    std::string addr;
+    CGI_TYPE type;
+    struct fcgi_list_addr *next;
+} fcgi_list_addr;
+//----------------------------------------------------------------------
+class Config
+{
+    Config(const Config&){}
+    Config& operator=(const Config&);
+
+public:
+    char PrintDebugMsg;
+
+    SSL_CTX *ctx;
+
+    std::string ServerSoftware;
+
+    std::string ServerAddr;
+    std::string ServerPort;
+
+    std::string DocumentRoot;
+    std::string ScriptPath;
+    std::string LogPath;
+    std::string PidFilePath;
+
+    std::string UsePHP;
+    std::string PathPHP;
+
+    int MaxConcurrentStreams;
+
+    int ListenBacklog;
+    char TcpNoDelay;
+
+    int DataBufSize;
+
+    int MaxAcceptConnections;
+
+    int MaxCgiProc;
+
+    int Timeout;
+    int TimeoutKeepAlive;
+    int TimeoutPoll;
+    int TimeoutCGI;
+
+    long int ClientMaxBodySize;
+
+    char ShowMediaFiles;
+
+    std::string user;
+    std::string group;
+
+    uid_t server_uid;
+    gid_t server_gid;
+
+    fcgi_list_addr *fcgi_list;
+    //------------------------------------------------------------------
+    Config()
+    {
+        fcgi_list = NULL;
+    }
+
+    ~Config()
+    {
+        free_fcgi_list();
+    }
+
+    void free_fcgi_list()
+    {
+        fcgi_list_addr *t;
+        while (fcgi_list)
+        {
+            t = fcgi_list;
+            fcgi_list = fcgi_list->next;
+            if (t)
+                delete t;
+        }
+    }
+};
+
+extern const Config* const conf;
+//======================================================================
 struct Stream
 {
     Stream *prev;
@@ -160,8 +244,12 @@ struct Stream
 
     ~Stream()
     {
-        if ((send_bytes != file_size) && (content == REGFILE))
-            print_err("<%s:%d> !!! ~Resp(%s), send_bytes != file_size, window_update=%ld, id=%d\n", __func__, __LINE__, uri, window_update, id);
+        //if (conf->PrintDebugMsg == 'y')
+        {
+            if ((send_bytes != file_size) && (content == REGFILE))
+                print_err("<%s:%d> !!! ~Resp(%s), send_bytes=%lld(%lld), wind_update=%ld, id=%d\n", 
+                        __func__, __LINE__, uri, send_bytes, file_size, window_update, id);
+        }
 
         if (fd > 0)
         {
