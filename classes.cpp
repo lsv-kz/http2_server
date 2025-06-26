@@ -95,11 +95,11 @@ int http2::close_stream(http2 *h2, int id, int *num_cgi)
 
             if (r->cgi.start)
             {
-                if (conf->PrintDebugMsg == 'y')
+                if (conf->PrintDebugMsg)
                     print_err("<%s:%d>~~~~~~~ close cgi stream, id=%d \n", __func__, __LINE__, r->id);
                 if (*num_cgi <= 0)
                 {
-                    if (conf->PrintDebugMsg == 'y')
+                    if (conf->PrintDebugMsg)
                         print_err("<%s:%d>~~~~~~~ Error: *num_cgi=%d, id=%d \n", __func__, __LINE__, *num_cgi, r->id);
                 }
                 else
@@ -499,7 +499,7 @@ int http2::parse(Stream *r)
             r->referer = val;
         else if (name == "range")
         {
-            if (conf->PrintDebugMsg == 'y')
+            if (conf->PrintDebugMsg)
                 fprintf(stderr, "<%s:%d> [%s: %s]\n", __func__, __LINE__, name.c_str(), val.c_str());
             r->range = val;
         }

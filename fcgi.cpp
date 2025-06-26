@@ -549,7 +549,7 @@ void EventHandlerClass::fcgi_get_headers(Connect* con, Stream *resp)
             }
 
             cont_type[j] = 0;
-            if (conf->PrintDebugMsg == 'y')
+            if (conf->PrintDebugMsg)
                 print_err(resp, "<%s:%d> Content-Type: %s, id=%d \n", __func__, __LINE__, cont_type, resp->id);
             set_frame_headers(resp);
             add_header(resp, 8, status_resp(resp->status));

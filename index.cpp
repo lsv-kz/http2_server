@@ -156,7 +156,7 @@ void create_index_html(Connect *r, char **list, int numFiles, string& path, Stre
         char size_s[32];
         snprintf(size_s, sizeof(size_s), "%lld", size);
 
-        if (isimage(list[i]) && (conf->ShowMediaFiles == 'y'))
+        if (isimage(list[i]) && conf->ShowMediaFiles)
         {
             resp->html.cat_str("   <tr><td><a href=\"");
             resp->html.cat_str(buf);
@@ -168,7 +168,7 @@ void create_index_html(Connect *r, char **list, int numFiles, string& path, Stre
             resp->html.cat_str(size_s);
             resp->html.cat_str(" bytes</td></tr>\r\n");
         }
-        else if (isaudio(list[i]) && (conf->ShowMediaFiles == 'y'))
+        else if (isaudio(list[i]) && conf->ShowMediaFiles)
         {
             resp->html.cat_str("   <tr><td><audio preload=\"none\" controls src=\"");
             resp->html.cat_str(buf);
@@ -180,7 +180,7 @@ void create_index_html(Connect *r, char **list, int numFiles, string& path, Stre
             resp->html.cat_str(size_s);
             resp->html.cat_str(" bytes</td></tr>\r\n");
         }
-        else if (isvideo(list[i]) && (conf->ShowMediaFiles == 'y'))
+        else if (isvideo(list[i]) && conf->ShowMediaFiles)
         {
             resp->html.cat_str("   <tr><td><video width=\"320\" preload=\"none\" controls src=\"");
             //resp->html.cat_str("   <tr><td><video preload=\"none\" controls src=\"");

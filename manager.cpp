@@ -36,7 +36,7 @@ unique_lock<mutex> lk(mtx_conn);
 //======================================================================
 void EventHandlerClass::close_connect(Connect *r)
 {
-    if (conf->PrintDebugMsg == 'y')
+    if (conf->PrintDebugMsg)
         print_err(r, "<%s:%d> Close connection\n", __func__, __LINE__);
 
     if (r->tls.ssl)
@@ -71,7 +71,7 @@ void EventHandlerClass::ssl_shutdown(Connect *conn)
             for ( int i = 0; i < 2; ++i)
             {
                 int ret = SSL_shutdown(conn->tls.ssl);
-                if (conf->PrintDebugMsg == 'y')
+                if (conf->PrintDebugMsg)
                 {
                     print_err(conn, "<%s:%d> SSL_shutdown()=%d\n", __func__, __LINE__, ret);
                 }

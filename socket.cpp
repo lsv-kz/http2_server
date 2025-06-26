@@ -38,7 +38,7 @@ int create_server_socket(const Config *conf)
         return -1;
     }
 
-    if (conf->TcpNoDelay == 'y')
+    if (conf->TcpNoDelay)
     {
         setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, (void *)&sock_opt, sizeof(sock_opt)); // SOL_TCP
     }
@@ -229,4 +229,26 @@ int write_to_fcgi(int fd, const char *buf, int len)
     }
 
     return ret;
+}
+//======================================================================
+int get_size_sock_buf(int domain, int optname, int type, int protocol)
+{
+    int sock = socket(domain, type, protocol);
+    if (sock < 0)
+    {
+        fprintf(stderr, "<%s:%d> Error socketpair(): %s\n", __func__, __LINE__, strerror(errno));
+        return -errno;
+    }
+
+    int sndbuf;
+    socklen_t optlen = sizeof(sndbuf);
+    if (getsockopt(sock, SOL_SOCKET, optname, &sndbuf, &optlen) < 0)
+    {
+        fprintf(stderr, "<%s:%d> Error getsockopt(SO_SNDBUF): %s\n", __func__, __LINE__, strerror(errno));
+        close(sock);
+        return -errno;
+    }
+
+    close(sock);
+    return sndbuf;
 }

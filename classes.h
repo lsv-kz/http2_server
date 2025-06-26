@@ -54,7 +54,7 @@ class Config
     Config& operator=(const Config&);
 
 public:
-    char PrintDebugMsg;
+    bool PrintDebugMsg;
 
     SSL_CTX *ctx;
 
@@ -74,7 +74,7 @@ public:
     int MaxConcurrentStreams;
 
     int ListenBacklog;
-    char TcpNoDelay;
+    bool TcpNoDelay;
 
     int DataBufSize;
 
@@ -89,7 +89,7 @@ public:
 
     long int ClientMaxBodySize;
 
-    char ShowMediaFiles;
+    bool ShowMediaFiles;
 
     std::string user;
     std::string group;

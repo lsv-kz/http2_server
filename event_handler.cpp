@@ -340,7 +340,7 @@ int EventHandlerClass::cgi_set_poll()
             int revents = poll_fd[poll_ind].revents;
             if ((fd != resp->cgi.to_script) && (fd != resp->cgi.from_script) && (fd != resp->cgi.fd))
             {
-                if (conf->PrintDebugMsg == 'y')
+                if (conf->PrintDebugMsg)
                     print_err("<%s:%d> revents=0x%02X, fd=%d (fd != cgi.fd),  id=%d\n", __func__, __LINE__, revents, fd, resp->id);
                 continue;
             }
@@ -385,7 +385,7 @@ int EventHandlerClass::cgi_set_poll()
             }
             else
             {
-                if (conf->PrintDebugMsg == 'y')
+                if (conf->PrintDebugMsg)
                     print_err("<%s:%d> revents=0, id=%d \n", __func__, __LINE__, resp->id);
             }
 
@@ -435,7 +435,7 @@ int EventHandlerClass::set_poll()
         {
             while ((c->ssl_pending = SSL_pending(c->tls.ssl)) && (c->h2.type_op != SEND_SETTINGS))
             {
-                if (conf->PrintDebugMsg == 'y')
+                if (conf->PrintDebugMsg)
                 {
                     print_err(c, "<%s:%d> ***** SSL_pending()=%d, %s\n", __func__, __LINE__, 
                                 c->ssl_pending, get_str_operation(c->h2.type_op));
@@ -481,7 +481,7 @@ int EventHandlerClass::set_poll()
 
                 if (c->h2.window_update <= 0)
                 {
-                    if (conf->PrintDebugMsg == 'y')
+                    if (conf->PrintDebugMsg)
                         print_err(c, "<%s:%d> h2.window_update <= 0\n", __func__, __LINE__);
                     conn_array[num_wait++] = c;
                     poll_fd[num_wait].events = POLLIN;

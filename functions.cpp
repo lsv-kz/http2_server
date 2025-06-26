@@ -111,6 +111,31 @@ int strlcmp_case(const char *s1, const char *s2, int len)
     return 0;
 }
 //======================================================================
+int strcmp_case(const char *s1, const char *s2)
+{
+    char c1, c2;
+
+    if (!s1 && !s2) return 0;
+    if (!s1) return -1;
+    if (!s2) return 1;
+
+    int diff = ('a' - 'A');
+
+    for (; (*s1) && (*s2); ++s1, ++s2)
+    {
+        c1 = *s1;
+        c2 = *s2;
+        if (!c1 && !c2) return 0;
+
+        c1 += (c1 >= 'A') && (c1 <= 'Z') ? diff : 0;
+        c2 += (c2 >= 'A') && (c2 <= 'Z') ? diff : 0;
+
+        if (c1 != c2) return (c1 - c2);
+    }
+
+    return (*s1 - *s2);
+}
+//======================================================================
 const char *get_str_frame_type(FRAME_TYPE t)
 {
     switch (t)
@@ -794,7 +819,7 @@ int set_response(Connect *con, Stream *resp)
         resp->fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
         if (resp->fd == -1)
         {
-            print_err(con, "<%s:%d> Error open(): %s\n", __func__, __LINE__, strerror(errno));
+            print_err(con, "<%s:%d> Error open(%s): %s\n", __func__, __LINE__, resp->decode_path.c_str(), strerror(errno));
             if (errno == EACCES)
                 resp_403(resp);
             else if (errno == ENOENT)

@@ -47,7 +47,7 @@ void create_conf_file(const char *path)
         exit(1);
     }
 
-    fprintf(f, "PrintDebugMsg        n\n");
+    fprintf(f, "PrintDebugMsg        off\n");
     fprintf(f, "ServerSoftware       ?\n");
     fprintf(f, "ServerAddr           0.0.0.0\n");
     fprintf(f, "ServerPort           8080\n\n");
@@ -57,10 +57,15 @@ void create_conf_file(const char *path)
     fprintf(f, "LogPath              www/logs\n");
     fprintf(f, "PidFilePath          www/pid\n\n");
 
-    fprintf(f, "ListenBacklog        128\n");
-    fprintf(f, "TcpNoDelay           y \n\n");
+    fprintf(f, "####### UsePHP: n, php-fpm, php-cgi #######\n");
+    fprintf(f, "UsePHP     php-fpm\n");
+    fprintf(f, "PathPHP    127.0.0.1:9000  # [php-fpm: 127.0.0.1:9000 (/var/run/php-fpm.sock)]\n\n");
 
-    fprintf(f, "MaxAcceptConnections     5000\n\n");
+    fprintf(f, "ListenBacklog        128\n");
+    fprintf(f, "TcpNoDelay           on\n\n");
+
+    fprintf(f, "MaxConcurrentStreams  128\n");
+    fprintf(f, "MaxAcceptConnections  5000\n\n");
 
     fprintf(f, "DataBufSize          16384\n\n");
 
@@ -68,12 +73,12 @@ void create_conf_file(const char *path)
 
     fprintf(f, "Timeout              35  # seconds\n");
     fprintf(f, "TimeoutKeepAlive     180 # seconds\n");
-    fprintf(f, "TimeoutCGI           15  # seconds\n");
     fprintf(f, "TimeoutPoll          100 # milliseconds\n\n");
+    fprintf(f, "TimeoutCGI           15  # seconds\n");
 
     fprintf(f, "ClientMaxBodySize    10000000\n\n");
 
-    fprintf(f, "ShowMediaFiles       y #  y/n \n\n");
+    fprintf(f, "ShowMediaFiles       on\n\n");
 
     fprintf(f, "User                 root\n");
     fprintf(f, "Group                www-data\n");
@@ -173,9 +178,13 @@ int is_number(const char *s)
 //======================================================================
 int is_bool(const char *s)
 {
-    if (!s || (strlen(s) != 1))
+    if (!s)
         return 0;
-    return ((tolower(s[0]) == 'y') || (tolower(s[0]) == 'n'));
+    if (!strcmp_case(s, "on"))
+        return 1;
+    if (!strcmp_case(s, "off"))
+        return 1;
+    return 0;
 }
 //======================================================================
 int find_bracket(FILE *f, char c)
@@ -259,7 +268,12 @@ int read_conf_file(FILE *fconf)
             ss >> s2;
 
             if ((s1 == "PrintDebugMsg") && is_bool(s2.c_str()))
-                c.PrintDebugMsg = (char)tolower(s2[0]);
+            {
+                if (strstr_case(s2.c_str(), "on"))
+                    c.PrintDebugMsg = true;
+                else if (strstr_case(s2.c_str(), "off"))
+                    c.PrintDebugMsg = false;
+            }
             else if (s1 ==  "ServerAddr")
                 s2 >> c.ServerAddr;
             else if (s1 == "ServerPort")
@@ -269,7 +283,12 @@ int read_conf_file(FILE *fconf)
             else if ((s1 == "MaxConcurrentStreams") && is_number(s2.c_str()))
                 s2 >> c.MaxConcurrentStreams;
             else if ((s1 == "TcpNoDelay") && is_bool(s2.c_str()))
-                c.TcpNoDelay = (char)tolower(s2[0]);
+            {
+                if (strstr_case(s2.c_str(), "on"))
+                    c.TcpNoDelay = true;
+                else if (strstr_case(s2.c_str(), "off"))
+                    c.TcpNoDelay = false;
+            }
             else if ((s1 == "ListenBacklog") && is_number(s2.c_str()))
                 s2 >> c.ListenBacklog;
             else if ((s1 == "DataBufSize") && is_number(s2.c_str()))
@@ -299,7 +318,12 @@ int read_conf_file(FILE *fconf)
             else if (s1 == "PathPHP")
                 s2 >> c.PathPHP;
             else if ((s1 == "ShowMediaFiles") && is_bool(s2.c_str()))
-                c.ShowMediaFiles = (char)tolower(s2[0]);
+            {
+                if (strstr_case(s2.c_str(), "on"))
+                    c.ShowMediaFiles = true;
+                else if (strstr_case(s2.c_str(), "off"))
+                    c.ShowMediaFiles = false;
+            }
             else if ((s1 == "ClientMaxBodySize") && is_number(s2.c_str()))
                 s2 >> c.ClientMaxBodySize;
             else if (s1 == "User")

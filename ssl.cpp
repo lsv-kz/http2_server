@@ -36,7 +36,7 @@ static int select_alpn(const unsigned char **out, unsigned char *outlen,
         {
             *out = (unsigned char *)&in[i + 1];
             *outlen = in[i];
-            if (conf->PrintDebugMsg == 'y')
+            if (conf->PrintDebugMsg)
                 hex_print_stderr(__func__, __LINE__, &in[i + 1], in[i]);
             return 0;
         }
@@ -65,7 +65,7 @@ static int alpn_select_proto_cb(SSL *ssl, const unsigned char **out,
                                 unsigned char *outlen, const unsigned char *in,
                                 unsigned int inlen, void *arg)
 {
-    if (conf->PrintDebugMsg == 'y')
+    if (conf->PrintDebugMsg)
         hex_print_stderr(__func__, __LINE__, in, inlen);
     int rv = select_next_protocol((unsigned char **)out, outlen, in, inlen);
     if (rv == 0)
@@ -154,7 +154,7 @@ int ssl_read(Connect *con, char *buf, int len)
         con->tls.err = SSL_get_error(con->tls.ssl, ret);
         if (con->tls.err == SSL_ERROR_ZERO_RETURN)
         {
-            if (conf->PrintDebugMsg == 'y')
+            if (conf->PrintDebugMsg)
                 print_err(con, "<%s:%d> Error SSL_read(): SSL_ERROR_ZERO_RETURN\n", __func__, __LINE__);
             return 0;
         }

@@ -310,14 +310,18 @@ public:
     void close_event_handler();
 };
 //----------------------------------------------------------------------
-int write_to_fcgi(int fd, const char *buf, int len);
+int create_server_socket(const Config *c);
 int create_fcgi_socket(Stream *r);
-
+int read_from_client(Connect *c, char *buf, int len);
+int write_to_client(Connect *c, const char *buf, int len, int id);
+int write_to_fcgi(int fd, const char *buf, int len);
+int get_size_sock_buf(int domain, int optname, int type, int protocol);
+//----------------------------------------------------------------------
 int scgi_create_connect(Connect *c, Stream *r);
 int scgi_create_params(Connect *c, Stream *r);
 int scgi_set_param(Connect *c, Stream *r);
 int scgi_set_size_data(Connect* c, Stream *r);
-
+//----------------------------------------------------------------------
 void fcgi_set_header(ByteArray* ba, unsigned char type);
 void fcgi_set_header(char *s, unsigned char type, int dataLen);
 int fcgi_create_connect(Stream *r);
@@ -334,10 +338,6 @@ int set_max_fd(int max_open_fd);
 //----------------------------------------------------------------------
 int index_dir(Connect *c, std::string& path, Stream *r);
 //----------------------------------------------------------------------
-int read_from_client(Connect *c, char *buf, int len);
-int write_to_client(Connect *c, const char *buf, int len, int id);
-int read_request_headers(Connect* c);
-//----------------------------------------------------------------------
 int encode(const char *s_in, char *s_out, int len_out);
 int decode(const char *s_in, int len_in, std::string& s_out);
 //----------------------------------------------------------------------
@@ -348,6 +348,7 @@ std::string log_time(time_t t);
 
 const char *strstr_case(const char * s1, const char *s2);
 int strlcmp_case(const char *s1, const char *s2, int len);
+int strcmp_case(const char *s1, const char *s2);
 
 const char *get_str_frame_type(FRAME_TYPE);
 const char *get_str_operation(OPERATION_HTTP2);

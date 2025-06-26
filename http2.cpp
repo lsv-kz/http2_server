@@ -55,7 +55,7 @@ int EventHandlerClass::http2_worker_connections(Connect *con)
             return -1;
         }
 
-        if (conf->PrintDebugMsg == 'y')
+        if (conf->PrintDebugMsg)
             hex_print_stderr("send SETTINGS", __LINE__, con->h2.settings.ptr_remain(), con->h2.settings.size_remain());
 
         con->h2.settings.set_offset(ret);
@@ -145,7 +145,7 @@ int EventHandlerClass::http2_worker_connections(Connect *con)
         {
             print_err(con, "<%s:%d> SSL_SHUTDOWN: SSL_read()=%d\n", __func__, __LINE__, err);
             con->sock_timer = 0;
-            if (conf->PrintDebugMsg == 'y')
+            if (conf->PrintDebugMsg)
                 hex_print_stderr("recv SSL_SHUTDOWN", __LINE__, buf, err);
         }
         return 0;
@@ -256,7 +256,7 @@ int EventHandlerClass::recv_from_client(Connect *con)
         if (con->h2.type == SETTINGS)
         {
             con->sock_timer = 0;
-            if (conf->PrintDebugMsg == 'y')
+            if (conf->PrintDebugMsg)
             {
                 hex_print_stderr("recv SETTINGS", __LINE__, con->h2.header, 9);
                 hex_print_stderr("recv SETTINGS", __LINE__, con->h2.body.ptr(), con->h2.body.size());
@@ -277,7 +277,7 @@ int EventHandlerClass::recv_from_client(Connect *con)
 
             if (con->h2.header[4] == FLAG_ACK)
             {
-                if (conf->PrintDebugMsg == 'y')
+                if (conf->PrintDebugMsg)
                     print_err(con, "<%s:%d> recv SETTINGS flag=ACK\n", __func__, __LINE__);
                 con->h2.ack_recv = true;
                 con->h2.type_op = WORK_STREAM;
@@ -326,7 +326,7 @@ int EventHandlerClass::recv_from_client(Connect *con)
             }
             else
                 p_buf = buf;
-            if (conf->PrintDebugMsg == 'y')
+            if (conf->PrintDebugMsg)
             {
                 if (con->h2.body_len < 100)
                     print_err(resp, "<%s:%d> +++ DATA %d, con.serv_wind_size=%ld, stream.wind_update=%ld, id=%d \n", __func__, __LINE__, con->h2.body_len, con->h2.server_window_size, resp->cgi.window_update, resp->id);
@@ -388,7 +388,7 @@ int EventHandlerClass::recv_from_client(Connect *con)
                 return 0;
             }
 
-            if (conf->PrintDebugMsg == 'y')
+            if (conf->PrintDebugMsg)
             {
                 print_err(resp, "\"%s\" new request <%s:%d> headers.size=%d, id=%d \n", resp->decode_path.c_str(), 
                                     __func__, __LINE__, resp->headers.size(), resp->id);
@@ -396,7 +396,7 @@ int EventHandlerClass::recv_from_client(Connect *con)
         }
         else if (con->h2.type == GOAWAY)
         {
-            if (conf->PrintDebugMsg == 'y')
+            if (conf->PrintDebugMsg)
                 print_err(con, "<%s:%d> GOAWAY [%u] id=%d \n", __func__, __LINE__, (unsigned int)buf[7], con->h2.id);
             return -1;
         }
@@ -447,13 +447,13 @@ int EventHandlerClass::recv_from_client(Connect *con)
         else if (con->h2.type == PRIORITY)
         {
             con->sock_timer = 0;
-            if (conf->PrintDebugMsg == 'y')
+            if (conf->PrintDebugMsg)
                 print_err(con, "<%s:%d> PRIORITY id=%d\n", __func__, __LINE__, con->h2.id);
         }
         else
         {
             con->sock_timer = 0;
-            if (conf->PrintDebugMsg == 'y')
+            if (conf->PrintDebugMsg)
                 print_err(con, "<%s:%d> frame type: %d, id=%d \n", __func__, __LINE__, con->h2.type, con->h2.id);
         }
     }
@@ -508,7 +508,7 @@ void EventHandlerClass::http2_worker_streams(Connect *con)
     {
         if (resp->cgi.window_update > 32000)
         {
-            if (conf->PrintDebugMsg == 'y')
+            if (conf->PrintDebugMsg)
                 print_err(resp, "<%s:%d> ??? resp->cgi.window_update(%ld) > 16000\n", __func__, __LINE__, resp->cgi.window_update);
         }
 
@@ -623,7 +623,7 @@ int EventHandlerClass::send_response(Connect *con, Stream *resp)
 
     if (ret != resp->data.size())
     {
-        if (conf->PrintDebugMsg == 'y')
+        if (conf->PrintDebugMsg)
         {
             print_err(resp, "<%s:%d> Error send frame DATA send %d bytes, size=%d, id=%d \n", 
                     __func__, __LINE__, ret, resp->data.size(), resp->id);
@@ -636,7 +636,7 @@ int EventHandlerClass::send_response(Connect *con, Stream *resp)
 
     if (resp->data.get_byte(4) == FLAG_END_STREAM)
     {
-        if (conf->PrintDebugMsg == 'y')
+        if (conf->PrintDebugMsg)
         {
             print_err(resp, "<%s:%d>... send frame DATA, END_STREAM, end request send %lld bytes, data.size=%d ... id=%d \n", 
                         __func__, __LINE__, resp->send_bytes, resp->data.size(), resp->id);
