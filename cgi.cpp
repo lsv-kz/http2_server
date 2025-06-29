@@ -73,6 +73,13 @@ int EventHandlerClass::cgi_fork(Stream *resp, int* serv_cgi, int* cgi_serv)
         close(cgi_serv[0]);
         cgi_serv[0] = -1;
 
+        int fd = open("/dev/null", O_RDONLY);
+        if (fd > 0)
+        {
+            dup2(fd, STDERR_FILENO);
+            close(fd);
+        }
+
         if (resp->method == "POST")
         {
             close(serv_cgi[1]);
@@ -302,7 +309,7 @@ int EventHandlerClass::cgi_stdout(Stream *resp, int fd)
 {
     char buf[conf->DataBufSize];
 
-    int ret = read(fd, buf, sizeof(buf) - 1);
+    int ret = read(fd, buf, sizeof(buf));
     if (ret == -1)
     {
         if (errno == EAGAIN)
@@ -419,14 +426,17 @@ void EventHandlerClass::cgi_worker(Connect *c, Stream *resp, struct pollfd *poll
 
         if (revents & POLLIN)
         {
+            if (resp->html.size() >= conf->DataBufSize)
+                return;
+
             int ret = cgi_stdout(resp, fd);
             if (ret == ERR_TRY_AGAIN)
             {
-                print_err(resp, "<%s:%d> cgi_stdout()=ERR_TRY_AGAIN\n", __func__, __LINE__);
+                print_err(resp, "<%s:%d> cgi_stdout()=ERR_TRY_AGAIN, id=%d \n", __func__, __LINE__, resp->id);
             }
             else if (ret < 0)
             {
-                print_err(resp, "<%s:%d> Error cgi_stdout()=%d\n", __func__, __LINE__, ret);
+                print_err(resp, "<%s:%d> Error cgi_stdout()=%d, id=%d \n", __func__, __LINE__, ret, resp->id);
                 send_rst_stream(c, resp->id);
                 c->h2.close_stream(&c->h2, resp->id, &all_cgi);
             }
@@ -438,12 +448,10 @@ void EventHandlerClass::cgi_worker(Connect *c, Stream *resp, struct pollfd *poll
                     resp->cgi.from_script = -1;
                 }
 
-                resp->send_cont_length = ret;
                 set_frame_data(resp, 0, FLAG_END_STREAM);
             }
             else
             {
-                resp->send_cont_length = ret;
                 if ((!resp->send_headers) && (!resp->create_headers))
                 {
                     const char *p1 = resp->html.ptr(), *p = NULL;
@@ -479,7 +487,6 @@ void EventHandlerClass::cgi_worker(Connect *c, Stream *resp, struct pollfd *poll
                             if (resp->status == RS204)
                             {
                                 create_message(resp, RS204);
-                                resp->send_cont_length = 0;
                                 set_frame_data(resp, 0, FLAG_END_STREAM);
 
                                 if (resp->cgi.cgi_type <= PHPCGI)
@@ -520,25 +527,12 @@ void EventHandlerClass::cgi_worker(Connect *c, Stream *resp, struct pollfd *poll
                             add_header(resp, 31, cont_type);
                             resp->create_headers = true;
                             resp->html.set_offset(p - resp->html.ptr());
-
-                            if (resp->html.size() > resp->html.get_offset())
-                            {
-                                int offs = resp->html.get_offset();
-                                set_frame_data(resp, resp->html.size() - offs, 0);
-                                resp->data.cat(resp->html.ptr() + offs, resp->html.size() - offs);
-                                resp->html.init();
-                            }
-                            else
-                            {
-                                resp->html.init();
-                            }
+                        }
+                        else
+                        {
+                            create_message(resp, RS502);
                         }
                     }
-                }
-                else
-                {
-                    set_frame_data(c, resp);
-                    resp->html.init();
                 }
             }
         }
@@ -555,7 +549,6 @@ void EventHandlerClass::cgi_worker(Connect *c, Stream *resp, struct pollfd *poll
                 resp->cgi.from_script = -1;
             }
 
-            resp->send_cont_length = 0;
             if (resp->html.size() == resp->html.get_offset())
             {
                 resp->html.init();
@@ -568,9 +561,10 @@ void EventHandlerClass::cgi_worker(Connect *c, Stream *resp, struct pollfd *poll
                 else
                 {
                     create_message(resp, RS500);
+                    return;
                 }
             }
-
+            //print_err(resp, "<%s:%d> revents=0x%02X, html.size_remain()=%d, id=%d \n", __func__, __LINE__, revents, resp->html.size_remain(), resp->id);
             resp->cgi.cgi_end = true;
         }
     }

@@ -581,23 +581,32 @@ int set_frame_data(Connect *con, Stream *resp)
         if ((resp->create_headers == false) && (resp->send_headers == false))
             return 0;
         resp->data.init();
-        if (resp->html.size() > resp->html.get_offset())
+        if (resp->html.size_remain())
         {
-            int offs = resp->html.get_offset();
-            set_frame_data(resp, resp->html.size() - offs, 0);
-            resp->data.cat(resp->html.ptr() + offs, resp->html.size() - offs);
-            resp->html.init();
+            int len = resp->html.size_remain();
+            if (len > conf->DataBufSize)
+                len = conf->DataBufSize;
+            
+            set_frame_data(resp, len, 0);
+            resp->data.cat(resp->html.ptr_remain(), len);
+            resp->html.set_offset(len);
+            if (resp->html.size_remain() == 0)
+                resp->html.init();
         }
-
-        if (resp->cgi.cgi_end)
+        else
         {
-            char s[] = "\0\0\0\0\1\0\0\0\0";
-            s[5] = (resp->id>>24) & 0x7f;
-            s[6] = (resp->id>>16) & 0xff;
-            s[7] = (resp->id>>8) & 0xff;
-            s[8] = resp->id & 0xff;
-            resp->data.cat(s, 9);
-            resp->send_ready |= FRAME_DATA_READY;
+            if (resp->cgi.cgi_end)
+            {
+                char s[] = "\0\0\0\0\1\0\0\0\0";
+                s[5] = (resp->id>>24) & 0x7f;
+                s[6] = (resp->id>>16) & 0xff;
+                s[7] = (resp->id>>8) & 0xff;
+                s[8] = resp->id & 0xff;
+                resp->data.cat(s, 9);
+                resp->send_ready |= FRAME_DATA_READY;
+            }
+            else
+                return 0;
         }
     }
     else
@@ -607,7 +616,7 @@ int set_frame_data(Connect *con, Stream *resp)
         long win_update = (con->h2.window_update > resp->window_update) ? resp->window_update : con->h2.window_update;
         if (win_update <= 0)
         {
-            print_err(con, "<%s:%d> !!! h2.window_update=%ld, resp->window_update=%ld, id=%d\n", __func__, __LINE__, con->h2.window_update, resp->window_update, resp->id);
+            print_err(resp, "<%s:%d> !!! h2.window_update=%ld, resp->window_update=%ld, id=%d\n", __func__, __LINE__, con->h2.window_update, resp->window_update, resp->id);
             return 0;
         }
 
@@ -847,9 +856,8 @@ int set_response(Connect *con, Stream *resp)
             smg.cpy_str("301 Moved Permanently\n");
             smg.cat(resp->path.c_str(), resp->path.size());
 
-            resp->send_cont_length = smg.size();
             char s[128];
-            snprintf(s, sizeof(s), "%lld", resp->send_cont_length);
+            snprintf(s, sizeof(s), "%d", smg.size());
             add_header(resp, 28, s);
 
             set_frame_data(resp, smg.size(), FLAG_END_STREAM);
@@ -960,7 +968,6 @@ void resp_200(Stream *resp)
 
     const char *err = "200 OK";
     int len = strlen(err);
-    resp->send_cont_length = 0;
     set_frame_data(resp, len, FLAG_END_STREAM);
     resp->data.cat(err, len);
 }
@@ -973,8 +980,6 @@ void resp_204(Stream *resp)
     add_header(resp, 33, get_time().c_str());
     add_header(resp, 28, "0");
     resp->create_headers = true;
-
-    resp->send_cont_length = 0;
     set_frame_data(resp, 0, FLAG_END_STREAM);
 }
 //======================================================================
@@ -992,7 +997,6 @@ void resp_400(Stream *resp)
 
     const char *err = "400 Bad Request";
     int len = strlen(err);
-    resp->send_cont_length = 0;
     set_frame_data(resp, len, FLAG_END_STREAM);
     resp->data.cat(err, len);
 }
@@ -1011,7 +1015,6 @@ void resp_403(Stream *resp)
 
     const char *err = "403 Forbidden";
     int len = strlen(err);
-    resp->send_cont_length = 0;
     set_frame_data(resp, len, FLAG_END_STREAM);
     resp->data.cat(err, len);
 }
@@ -1030,7 +1033,6 @@ void resp_404(Stream *resp)
 
     const char *err = "404 Not Found";
     int len = strlen(err);
-    resp->send_cont_length = 0;
     set_frame_data(resp, len, FLAG_END_STREAM);
     resp->data.cat(err, len);
 }
@@ -1049,7 +1051,6 @@ void resp_411(Stream *resp)
 
     const char *err = "411 Length Required";
     int len = strlen(err);
-    resp->send_cont_length = 0;
     set_frame_data(resp, len, FLAG_END_STREAM);
     resp->data.cat(err, len);
 }
@@ -1068,7 +1069,6 @@ void resp_413(Stream *resp)
 
     const char *err = "413 Request entity too large";
     int len = strlen(err);
-    resp->send_cont_length = 0;
     set_frame_data(resp, len, FLAG_END_STREAM);
     resp->data.cat(err, len);
 }
@@ -1087,7 +1087,6 @@ void resp_500(Stream *resp)
 
     const char *err = "500 Internal Server Error";
     int len = strlen(err);
-    resp->send_cont_length = 0;
     set_frame_data(resp, len, FLAG_END_STREAM);
     resp->data.cat(err, len);
 }
@@ -1106,7 +1105,6 @@ void resp_502(Stream *resp)
 
     const char *err = "502 Bad Gateway";
     int len = strlen(err);
-    resp->send_cont_length = 0;
     set_frame_data(resp, len, FLAG_END_STREAM);
     resp->data.cat(err, len);
 }
@@ -1125,7 +1123,6 @@ void resp_504(Stream *resp)
 
     const char *err = "504 Gateway Time-out";
     int len = strlen(err);
-    resp->send_cont_length = 0;
     set_frame_data(resp, len, FLAG_END_STREAM);
     resp->data.cat(err, len);
 }

@@ -292,7 +292,10 @@ int read_conf_file(FILE *fconf)
             else if ((s1 == "ListenBacklog") && is_number(s2.c_str()))
                 s2 >> c.ListenBacklog;
             else if ((s1 == "DataBufSize") && is_number(s2.c_str()))
+            {
                 s2 >> c.DataBufSize;
+                c.DataBufSize -= 9;
+            }
             else if ((s1 == "MaxAcceptConnections") && is_number(s2.c_str()))
                 s2 >> c.MaxAcceptConnections;
             else if ((s1 == "TimeoutPoll") && is_number(s2.c_str()))

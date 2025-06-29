@@ -184,9 +184,9 @@ int ssl_write(Connect *con, const char *buf, int len, int id)
     ERR_clear_error();
     if ((con == NULL) || (buf == NULL) || (len <= 0) || (len > (conf->DataBufSize + 9)))
     {
-		print_err("<%s:%d> ??? Error conn=%p, buf=%p, len=%d\n", __func__, __LINE__, con, buf, len);
-		return -1;
-	}
+        print_err("<%s:%d> ??? Error conn=%p, buf=%p, len=%d\n", __func__, __LINE__, con, buf, len);
+        return -1;
+    }
 
     int ret = SSL_write(con->tls.ssl, buf, len);
     if (ret <= 0)

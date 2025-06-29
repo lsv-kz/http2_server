@@ -402,6 +402,7 @@ int EventHandlerClass::recv_from_client(Connect *con)
         }
         else if (con->h2.type == PING)
         {
+            con->sock_timer = 0;
             print_err(con, "<%s:%d> recv PING id=%d \n", __func__, __LINE__, con->h2.id);
             con->h2.frame.cpy("\x0\x0\x8\x6\x1\x0\x0\x0\x0", 9);
             con->h2.frame.cat(buf, 8);
@@ -565,7 +566,7 @@ void EventHandlerClass::http2_worker_streams(Connect *con)
     }
 
     if (con->h2.next)
-		con->h2.next = con->h2.next->next;
+        con->h2.next = con->h2.next->next;
 }
 //=============================================================================================================================
 int EventHandlerClass::send_response(Connect *con, Stream *resp)
@@ -587,16 +588,11 @@ int EventHandlerClass::send_response(Connect *con, Stream *resp)
 
     if (resp->data.size() == 0)
     {
-        if (resp->content == DYN_PAGE)
+        int ret = set_frame_data(con, resp);
+        if (ret < 0)
+            return ret;
+        else if (ret == 0)
             return 0;
-        else
-        {
-            int ret = set_frame_data(con, resp);
-            if (ret < 0)
-                return ret;
-            else if (ret == 0)
-                return 0;
-        }
     }
 
     int ret = write_to_client(con, resp->data.ptr(), resp->data.size(), resp->id);
@@ -609,8 +605,8 @@ int EventHandlerClass::send_response(Connect *con, Stream *resp)
             return ERR_TRY_AGAIN;
         }
 
-        print_err(resp, "<%s:%d> Error send frame DATA: %d, %d, id=%d \n", __func__, __LINE__,
-                                                ret, resp->data.size(), resp->id);
+        print_err(resp, "<%s:%d> Error send frame DATA: %d, %d, send_bytes=%lld, id=%d \n", __func__, __LINE__,
+                                                ret, resp->data.size(), resp->send_bytes, resp->id);
         close_stream(con, resp->id);
         return -1;
     }
@@ -623,12 +619,8 @@ int EventHandlerClass::send_response(Connect *con, Stream *resp)
 
     if (ret != resp->data.size())
     {
-        if (conf->PrintDebugMsg)
-        {
-            print_err(resp, "<%s:%d> Error send frame DATA send %d bytes, size=%d, id=%d \n", 
+        print_err(resp, "<%s:%d> Error send frame DATA send %d bytes, size=%d, id=%d \n", 
                     __func__, __LINE__, ret, resp->data.size(), resp->id);
-        }
-
         resp->data.init();
         close_stream(con, resp->id);
         return -1;
