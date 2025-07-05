@@ -160,10 +160,12 @@ int EventHandlerClass::cgi_set_poll()
                 {
                     if ((resp->cgi.cgi_type == CGI) || (resp->cgi.cgi_type == PHPCGI))
                     {
-                        if (cgi_create_proc(resp) < 0)
+                        int ret = cgi_create_proc(resp);
+                        if (ret < 0)
                         {
                             print_err(c, "<%s:%d> Error cgi_create_proc()\n", __func__, __LINE__);
-                            create_message(resp, RS500);
+                            if (ret == -1)
+                                create_message(resp, RS500);
                             continue;
                         }
 
@@ -433,6 +435,7 @@ int EventHandlerClass::set_poll()
         }
         else
         {
+            int ret = 0;
             while ((c->ssl_pending = SSL_pending(c->tls.ssl)) && (c->h2.type_op != SEND_SETTINGS))
             {
                 if (conf->PrintDebugMsg)
@@ -441,50 +444,32 @@ int EventHandlerClass::set_poll()
                                 c->ssl_pending, get_str_operation(c->h2.type_op));
                 }
 
-                http2_worker_connections(c);
+                ret = http2_worker_connections(c);
+                if (ret < 0)
+                    break;
             }
 
-            if ((c->h2.type_op == PREFACE_MESSAGE) ||
-                (c->h2.type_op == SSL_ACCEPT) ||
-                (c->h2.type_op == SSL_SHUTDOWN) ||
-                (c->h2.type_op == RECV_SETTINGS)
-            )
-            {
-                poll_fd[num_wait].fd = c->clientSocket;
+            if (ret < 0)
+                continue;
+            if (c->h2.next == NULL)
+                c->h2.next = c->h2.start;
 
-                if (c->h2.type_op == PREFACE_MESSAGE)
-                    poll_fd[num_wait].events = POLLIN;
-                else if ((c->h2.type_op == SSL_ACCEPT) || (c->h2.type_op == SSL_SHUTDOWN))
-                    poll_fd[num_wait].events = c->tls.poll_event;
-                else if (c->h2.type_op == RECV_SETTINGS)
-                    poll_fd[num_wait].events = POLLIN;
-                else
-                {
-                    print_err(c, "<%s:%d> *********Error********** c->h2.type_op=%d\n", __func__, __LINE__, c->h2.type_op);
-                    exit(7);
-                }
-
-                conn_array[num_wait++] = c;
-            }
+            poll_fd[num_wait].fd = c->clientSocket;
+            poll_fd[num_wait].events = 0;
+            if ((c->h2.type_op == SSL_ACCEPT) || (c->h2.type_op == SSL_SHUTDOWN))
+                poll_fd[num_wait].events = c->tls.poll_event;
+            else if ((c->h2.type_op == PREFACE_MESSAGE) || (c->h2.type_op == RECV_SETTINGS))
+                poll_fd[num_wait].events = POLLIN;
             else if (c->h2.type_op == SEND_SETTINGS)
-            {
-                poll_fd[num_wait].fd = c->clientSocket;
                 poll_fd[num_wait].events = POLLOUT;
-                conn_array[num_wait++] = c;
-            }
             else // h2.type_op = WORK_STREAM
             {
-                if (c->h2.next == NULL)
-                    c->h2.next = c->h2.start;
-                poll_fd[num_wait].fd = c->clientSocket;
                 poll_fd[num_wait].events = POLLIN;
-
                 if (c->h2.window_update <= 0)
                 {
                     if (conf->PrintDebugMsg)
                         print_err(c, "<%s:%d> h2.window_update <= 0\n", __func__, __LINE__);
                     conn_array[num_wait++] = c;
-                    poll_fd[num_wait].events = POLLIN;
                     continue;
                 }
 
@@ -495,25 +480,20 @@ int EventHandlerClass::set_poll()
                     continue;
                 }
 
-                if (c->h2.window_update > 0)
+                Stream *resp_next = NULL, *resp = c->h2.get();
+                for ( int i = 0; resp; resp = resp_next, i++)
                 {
-                    Stream *resp_next = NULL, *resp = c->h2.get();
-                    for ( ; resp; resp = resp_next)
+                    resp_next = resp->next;
+                    if (resp->frame_win_update.size() || resp->headers.size() || (resp->window_update > 0) || resp->rst_stream)
                     {
-                        resp_next = resp->next;
-                        if (resp->frame_win_update.size() || resp->headers.size() || (resp->window_update > 0))
-                        {
-                            poll_fd[num_wait].events |= POLLOUT;
-                            break;
-                        }
+                        poll_fd[num_wait].events |= POLLOUT;
+                        break;
                     }
                 }
-
-                if (poll_fd[num_wait].events)
-                {
-                    conn_array[num_wait++] = c;
-                }
             }
+
+            if (poll_fd[num_wait].events)
+                conn_array[num_wait++] = c;
         }
     }
 
@@ -541,12 +521,15 @@ int EventHandlerClass::poll_worker()
     }
     else
     {
+        //print_err("<%s:%d> Error num_wait()=0\n", __func__, __LINE__);
         return 0;
     }
 
     for ( int conn_ind = 0; conn_ind < num_wait; ++conn_ind)
     {
         Connect *con = conn_array[conn_ind];
+        if (poll_fd[conn_ind].revents == 0)
+            continue;
 
         int revents = poll_fd[conn_ind].revents;
         if (revents & ((~POLLIN) & (~POLLOUT)))
@@ -562,47 +545,30 @@ int EventHandlerClass::poll_worker()
             continue;
         }
 
-        if ((con->h2.type_op == PREFACE_MESSAGE) ||
-            (con->h2.type_op == SSL_ACCEPT) ||
-            (con->h2.type_op == SSL_SHUTDOWN) ||
-            (con->h2.type_op == RECV_SETTINGS)
-        )
+        if (poll_fd[conn_ind].fd != con->clientSocket)
         {
-            if (con->h2.type_op == RECV_SETTINGS)
-            {
-                if (poll_fd[conn_ind].revents & POLLIN)
-                {
-                    if (recv_from_client(con) < 0)
-                    {
-                        ssl_shutdown(con);
-                        continue;
-                    }
-                }
-            }
-            else if (poll_fd[conn_ind].revents & (POLLIN | POLLOUT))
-                http2_worker_connections(con);
+            print_err(con, "<%s:%d> !!! Error: fd=%d/clientSocket=%d\n", __func__, __LINE__, poll_fd[conn_ind].fd, con->clientSocket);
+            ssl_shutdown(con);
+            continue;
         }
-        else if (con->h2.type_op == SEND_SETTINGS)
+
+        con->fd_revents = revents;
+        if (poll_fd[conn_ind].revents & POLLIN)
         {
-            http2_worker_connections(con);
-        }
-        else
-        {
-            int fd = poll_fd[conn_ind].fd;
-            if (fd != con->clientSocket)
+            if (http2_worker_connections(con) < 0)
             {
-                print_err(con, "<%s:%d> !!! Error: fd=%d/clientSocket=%d\n", __func__, __LINE__, fd, con->clientSocket);
-                ssl_shutdown(con);
+                //print_err(con, "<%s:%d> !!! Error: http2_worker_connections()<0, %s\n", __func__, __LINE__, get_str_operation(con->h2.type_op));
                 continue;
             }
+        }
 
-            if (poll_fd[conn_ind].revents & POLLIN)
+        if (poll_fd[conn_ind].revents & POLLOUT)
+        {
+            if ((con->h2.type_op == SEND_SETTINGS) || (con->h2.type_op == SSL_ACCEPT) || (con->h2.type_op == SSL_SHUTDOWN))
             {
-                con->fd_revents = POLLIN;
                 http2_worker_connections(con);
             }
-
-            if (poll_fd[conn_ind].revents & POLLOUT)
+            else
             {
                 http2_worker_streams(con);
             }

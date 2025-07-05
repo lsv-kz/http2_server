@@ -57,7 +57,7 @@ int EventHandlerClass::cgi_fork(Stream *resp, int* serv_cgi, int* cgi_serv)
     {
         print_err(resp, "<%s:%d> script (%s) not found\n", __func__, __LINE__, resp->cgi.path.c_str());
         create_message(resp, RS404);
-        return 0;
+        return -RS404;
     }
     //--------------------------- fork ---------------------------------
     pid_t pid = fork();
@@ -202,7 +202,7 @@ int EventHandlerClass::cgi_create_proc(Stream *resp)
 
             close(cgi_serv[1]);
             cgi_serv[1] = -1;
-            return -RS500;
+            return -1;
         }
     }
     else
@@ -428,7 +428,6 @@ void EventHandlerClass::cgi_worker(Connect *c, Stream *resp, struct pollfd *poll
         {
             if (resp->html.size() >= conf->DataBufSize)
                 return;
-
             int ret = cgi_stdout(resp, fd);
             if (ret == ERR_TRY_AGAIN)
             {
@@ -442,6 +441,8 @@ void EventHandlerClass::cgi_worker(Connect *c, Stream *resp, struct pollfd *poll
             }
             else if (ret == 0)
             {
+                if (resp->html.size())
+                    return;
                 if (resp->cgi.cgi_type <= PHPCGI)
                 {
                     close(resp->cgi.from_script);

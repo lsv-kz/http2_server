@@ -18,7 +18,8 @@ int EventHandlerClass::http2_worker_connections(Connect *con)
                 ssl_shutdown(con);
                 return -1;
             }
-
+            if (conf->PrintDebugMsg)
+                hex_print_stderr(__func__, __LINE__, buf, 24);
             con->sock_timer = 0;
             con->h2.type_op = SEND_SETTINGS;
             con->h2.init();
@@ -77,14 +78,14 @@ int EventHandlerClass::http2_worker_connections(Connect *con)
         if (ret < 1)
         {
             con->tls.err = SSL_get_error(con->tls.ssl, ret);
+            if (conf->PrintDebugMsg)
+                print_err(con, "<%s:%d> Error SSL_accept()=%d: %s\n", __func__, __LINE__, ret, ssl_strerror(con->tls.err));
             if (con->tls.err == SSL_ERROR_WANT_READ)
             {
-                ///print_err(con, "<%s:%d> SSL_accept()=%d: %s\n", __func__, __LINE__, ret, ssl_strerror(con->tls.err));
                 con->tls.poll_event = POLLIN;
             }
             else if (con->tls.err == SSL_ERROR_WANT_WRITE)
             {
-                //print_err(con, "<%s:%d> SSL_accept()=%d: %s\n", __func__, __LINE__, ret, ssl_strerror(con->tls.err));
                 con->tls.poll_event = POLLOUT;
             }
             else
@@ -109,6 +110,8 @@ int EventHandlerClass::http2_worker_connections(Connect *con)
                     con->sock_timer = 0;
                     return 0;
                 }
+
+                hex_print_stderr(__func__, __LINE__, alpn, alpnlen);
             }
 
             print_err(con, "<%s:%d> Error: no protocol has been selected\n", __func__, __LINE__);
@@ -181,7 +184,7 @@ int EventHandlerClass::send_window_update(Connect *con)
     con->h2.frame_win_update.init();
     con->h2.send_ready &= (~FRAME_WINUPDATE_CONNECT_READY);
 
-    return 1;
+    return 0;
 }
 //======================================================================
 int EventHandlerClass::send_window_update(Connect *con, Stream *resp)
@@ -201,7 +204,7 @@ int EventHandlerClass::send_window_update(Connect *con, Stream *resp)
     resp->frame_win_update.init();
     resp->send_ready &= (~FRAME_WINUPDATE_STREAM_READY);
 
-    return 1;
+    return 0;
 }
 //======================================================================
 int EventHandlerClass::recv_from_client(Connect *con)
@@ -222,6 +225,9 @@ int EventHandlerClass::recv_from_client(Connect *con)
     }
     else if (n == 9)
     {
+        if (conf->PrintDebugMsg)
+            hex_print_stderr(__func__, __LINE__, con->h2.header, 9);
+
         con->h2.body_len = ((unsigned char)con->h2.header[0]<<16) +
             ((unsigned char)con->h2.header[1]<<8) + (unsigned char)con->h2.header[2];
         con->h2.type = (FRAME_TYPE)con->h2.header[3];
@@ -229,7 +235,7 @@ int EventHandlerClass::recv_from_client(Connect *con)
         con->h2.id = (((unsigned char)con->h2.header[5] & 0x7f)<<16) + ((unsigned char)con->h2.header[6]<<16) +
             ((unsigned char)con->h2.header[7]<<8) + (unsigned char)con->h2.header[8];
         con->h2.init();
-//hex_print_stderr(__func__, __LINE__, con->h2.header, 9);
+
         char buf[con->h2.body_len];
         if (con->h2.body_len > 0)
         {
@@ -241,10 +247,9 @@ int EventHandlerClass::recv_from_client(Connect *con)
                     return 0;
                 }
 
-                if (con->h2.type == HEADERS)
+                if (con->h2.type == HEADERS) /* -------------- */
                 {
                     send_rst_stream(con, con->h2.id);
-                    return 0;
                 }
 
                 return -1;
@@ -377,6 +382,7 @@ int EventHandlerClass::recv_from_client(Connect *con)
             {
                 print_err(con, "<%s:%d> Error id=%d \n", __func__, __LINE__, con->h2.id);
                 send_rst_stream(con, con->h2.id);
+                close_stream(con, con->h2.id);
                 return 0;
             }
 
@@ -388,15 +394,12 @@ int EventHandlerClass::recv_from_client(Connect *con)
                 return 0;
             }
 
-            if (conf->PrintDebugMsg)
-            {
-                print_err(resp, "\"%s\" new request <%s:%d> headers.size=%d, id=%d \n", resp->decode_path.c_str(), 
-                                    __func__, __LINE__, resp->headers.size(), resp->id);
-            }
+            //if (conf->PrintDebugMsg)
+                print_err(resp, "\"%s\" new request headers.size=%d, id=%d \n", resp->decode_path.c_str(), resp->headers.size(), resp->id);
         }
         else if (con->h2.type == GOAWAY)
         {
-            if (conf->PrintDebugMsg)
+            //if (conf->PrintDebugMsg)
                 print_err(con, "<%s:%d> GOAWAY [%u] id=%d \n", __func__, __LINE__, (unsigned int)buf[7], con->h2.id);
             return -1;
         }
@@ -409,8 +412,6 @@ int EventHandlerClass::recv_from_client(Connect *con)
             int ret = write_to_client(con, con->h2.frame.ptr(), con->h2.frame.size(), 0);
             if (ret <= 0)
             {
-                if (ret == ERR_TRY_AGAIN)
-                    return 0;
                 print_err(con, "<%s:%d> Error send frame %s,   id=%d \n", __func__, __LINE__, get_str_frame_type(con->h2.type), con->h2.id);
                 return -1;
             }
@@ -429,21 +430,25 @@ int EventHandlerClass::recv_from_client(Connect *con)
             if (con->h2.id == 0)
             {
                 con->h2.window_update += n;
+                if (conf->PrintDebugMsg)
+                    print_err(con, "<%s:%d> WINDOW_UPDATE %ld[%ld] id=%d \n", __func__, __LINE__, n, con->h2.window_update, con->h2.id);
             }
             else
             {
                 con->h2.set_window_size(con->numConn, con->h2.id, n);
+                if (conf->PrintDebugMsg)
+                    print_err(con, "<%s:%d> WINDOW_UPDATE %ld id=%d \n", __func__, __LINE__, n, con->h2.id);
             }
         }
         else if (con->h2.type == RST_STREAM)
         {
             con->sock_timer = 0;
             print_err(con, "<%s:%d> RST_STREAM [%u] id=%d \n", __func__, __LINE__, (unsigned int)buf[3], con->h2.id);
-            if (con->h2.get(con->h2.id))
-            {
-                print_log(con->h2.get(con->h2.id));
-                close_stream(con, con->h2.id);
-            }
+            Stream *str = con->h2.get(con->h2.id);
+            if (str)
+                str->rst_stream = true;
+            else
+                print_err(con, "<%s:%d> RST_STREAM Error stream id=%d does not exist\n", __func__, __LINE__, con->h2.id);
         }
         else if (con->h2.type == PRIORITY)
         {
@@ -454,7 +459,7 @@ int EventHandlerClass::recv_from_client(Connect *con)
         else
         {
             con->sock_timer = 0;
-            if (conf->PrintDebugMsg)
+            //if (conf->PrintDebugMsg)
                 print_err(con, "<%s:%d> frame type: %d, id=%d \n", __func__, __LINE__, con->h2.type, con->h2.id);
         }
     }
@@ -523,35 +528,12 @@ void EventHandlerClass::http2_worker_streams(Connect *con)
 
     if (resp->send_ready & FRAME_HEADERS_READY)
     {
-        if (resp->headers.size() && (!resp->send_headers))
+        int ret = send_headers(con, resp);
+        if (ret < 0)
         {
-            int ret = write_to_client(con, resp->headers.ptr(), resp->headers.size(), resp->id);
-            if (ret <= 0)
-            {
-                print_err(resp, "<%s:%d> Error send frame HEADERS: %d, id=%d \n", __func__, __LINE__, ret, resp->id);
-                if (ret == ERR_TRY_AGAIN)
-                    return;
-                close_stream(con, resp->id);
+            if (ret == ERR_TRY_AGAIN)
                 return;
-            }
-            else if (ret != resp->headers.size())
-            {
-                print_err(resp, "<%s:%d> Error send frame HEADERS: %d/%d, id=%d \n", __func__, __LINE__, 
-                                    ret, resp->headers.size(), resp->id);
-                close_stream(con, resp->id);
-                return;
-            }
-
-            resp->send_ready &= (~FRAME_HEADERS_READY);
-            con->sock_timer = 0;
-            resp->send_headers = true;
-            resp->headers.init();
-            return;
-        }
-        else
-        {
-            print_err(resp, "<%s:%d> !!! Error id=%d\n", __func__, __LINE__, resp->id);
-            close_stream(con, resp->id);
+            ssl_shutdown(con);
             return;
         }
     }
@@ -568,31 +550,74 @@ void EventHandlerClass::http2_worker_streams(Connect *con)
     if (con->h2.next)
         con->h2.next = con->h2.next->next;
 }
+//======================================================================
+int EventHandlerClass::send_headers(Connect *con, Stream *resp)
+{
+    if (resp->headers.size() && (!resp->send_headers))
+    {
+        int ret = write_to_client(con, resp->headers.ptr(), resp->headers.size(), resp->id);
+        if (ret <= 0)
+        {
+            if (ret == ERR_TRY_AGAIN)
+            {
+                print_err(resp, "<%s:%d> Error send frame HEADERS: SSL_ERROR_WANT_WRITE, id=%d \n", __func__, __LINE__, resp->id);
+                return ERR_TRY_AGAIN;
+            }
+
+            print_err(resp, "<%s:%d> Error send frame HEADERS: (%p)%d, id=%d \n", __func__, __LINE__, resp, ret, resp->id);
+            return -1;
+        }
+        else if (ret != resp->headers.size())
+        {
+            print_err(resp, "<%s:%d> !!! send frame HEADERS: %d/%d, id=%d \n", __func__, __LINE__, 
+                                ret, resp->headers.size(), resp->id);
+            return -1;
+        }
+
+        resp->send_ready &= (~FRAME_HEADERS_READY);
+        con->sock_timer = 0;
+        resp->send_headers = true;
+        resp->headers.init();
+        return 0;
+    }
+    else
+    {
+        print_err(resp, "<%s:%d> !!! Error id=%d\n", __func__, __LINE__, resp->id);
+        return -1;
+    }
+}
 //=============================================================================================================================
 int EventHandlerClass::send_response(Connect *con, Stream *resp)
 {
     if (resp->send_headers == false)
         return 0;
 
-    if (con->h2.window_update <= 0)
-    {
-        //print_err(resp, "<%s:%d> !!! h2.window_update(%ld) <= 0, id=%d \n", __func__, __LINE__, con->h2.window_update, resp->id);
-        return 0;
-    }
-
-    if (resp->window_update <= 0)
-    {
-        //print_err(resp, "<%s:%d> !!! window_update(%ld) <= 0, id=%d \n", __func__, __LINE__, resp->window_update, resp->id);
-        return 0;
-    }
-
     if (resp->data.size() == 0)
     {
-        int ret = set_frame_data(con, resp);
-        if (ret < 0)
-            return ret;
-        else if (ret == 0)
-            return 0;
+        if (resp->rst_stream)
+        {
+            set_frame_data(resp, 0, FLAG_END_STREAM);
+        }
+        else
+        {
+            if (con->h2.window_update <= 0)
+            {
+                //print_err(resp, "<%s:%d> !!! h2.window_update(%ld) <= 0, id=%d \n", __func__, __LINE__, con->h2.window_update, resp->id);
+                return 0;
+            }
+
+            if (resp->window_update <= 0)
+            {
+                //print_err(resp, "<%s:%d> !!! window_update(%ld) <= 0, %ld, id=%d \n", __func__, __LINE__, resp->window_update, con->h2.window_update, resp->id);
+                return 0;
+            }
+
+            int ret = set_frame_data(con, resp);
+            if (ret < 0)
+                return ret;
+            else if (ret == 0)
+                return 0;
+        }
     }
 
     int ret = write_to_client(con, resp->data.ptr(), resp->data.size(), resp->id);
@@ -607,7 +632,6 @@ int EventHandlerClass::send_response(Connect *con, Stream *resp)
 
         print_err(resp, "<%s:%d> Error send frame DATA: %d, %d, send_bytes=%lld, id=%d \n", __func__, __LINE__,
                                                 ret, resp->data.size(), resp->send_bytes, resp->id);
-        close_stream(con, resp->id);
         return -1;
     }
 
@@ -622,7 +646,6 @@ int EventHandlerClass::send_response(Connect *con, Stream *resp)
         print_err(resp, "<%s:%d> Error send frame DATA send %d bytes, size=%d, id=%d \n", 
                     __func__, __LINE__, ret, resp->data.size(), resp->id);
         resp->data.init();
-        close_stream(con, resp->id);
         return -1;
     }
 

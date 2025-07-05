@@ -404,7 +404,7 @@ void EventHandlerClass::fcgi_worker(Connect* con, Stream *resp, struct pollfd *p
         {
             if (resp->cgi.fcgiPaddingLen > 0)
             {
-                char s[resp->cgi.fcgiPaddingLen];
+                char s[256];
                 int ret = read(fd, s, resp->cgi.fcgiPaddingLen);
                 if (ret <= 0)
                 {

@@ -151,25 +151,6 @@ public:
         return sout_len;
     }
     //------------------------------------------------------------------
-    int decode_hex(const char *s_in, int len_in, std::string& s_out)
-    {
-        char s[len_in];
-
-        if (len_in <= 0)
-        {
-            fprintf(stderr, "<%s:%d> Error len=%d\n", __func__, __LINE__, len_in);
-            return -1;
-        }
-
-        int ret = hex_to_bytearray(s_in, len_in, s);
-        if (ret <= 0)
-        {
-            return -1;
-        }
-
-        return decode_bytearray(s, ret, s_out);
-    }
-    //------------------------------------------------------------------
     int decode_bytearray(const char *s, int len, std::string& s_out)
     {
         int n = 0;

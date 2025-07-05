@@ -174,6 +174,7 @@ struct Stream
 
     long long send_bytes;
 
+    bool rst_stream;
     bool create_headers;
     bool send_headers;
     int send_ready;
@@ -227,7 +228,7 @@ struct Stream
         Time = time(NULL);
         fd = -1;
         window_update = 0;
-        create_headers = send_headers = send_end_stream = false;
+        rst_stream = create_headers = send_headers = send_end_stream = false;
         send_ready = 0;
         offset = 0;
         file_size = 0;

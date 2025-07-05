@@ -265,6 +265,7 @@ class EventHandlerClass
 
     int send_html(Connect *c);
     int recv_from_client(Connect *c);
+    int send_headers(Connect *c, Stream *r);
     int send_response(Connect *c, Stream *r);
 
     void cgi_worker(Connect* c, Stream *resp);
