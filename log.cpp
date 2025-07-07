@@ -107,7 +107,7 @@ mtxLog.unlock();
 void print_err(Stream *resp, const char *format, ...)
 {
     va_list ap;
-    char buf[300];
+    char buf[1024];
     if (!resp)
     {
         fprintf(stderr, "<%s:%d> !!! resp=NULL\n", __func__, __LINE__);
@@ -118,8 +118,10 @@ void print_err(Stream *resp, const char *format, ...)
     vsnprintf(buf, sizeof(buf), format, ap);
     va_end(ap);
 
-    String ss(256);
+    String ss(1024);
     ss << "[" << log_time() << "] - [" << resp->numConn << "/" << resp->numReq << "] " << buf;
+    if (ss.size() > 800)
+        return;
 
 mtxLog.lock();
     write(flog_err, ss.c_str(), ss.size());

@@ -140,32 +140,44 @@ const char *get_str_frame_type(FRAME_TYPE t)
 {
     switch (t)
     {
-        case DATA:
+        case DATA: // 0
             return "DATA";
-        case HEADERS:
+        case HEADERS: // 1
             return "HEADERS";
-        case PRIORITY:
+        case PRIORITY: // 2
             return "PRIORITY";
-        case RST_STREAM:
+        case RST_STREAM: // 3
             return "RST_STREAM";
-        case SETTINGS:
+        case SETTINGS: // 4
             return "SETTINGS";
-        case PUSH_PROMISE:
+        case PUSH_PROMISE: // 5
             return "PUSH_PROMISE";
-        case PING:
+        case PING: // 6
             return "PING";
-        case GOAWAY:
+        case GOAWAY: // 7
             return "GOAWAY";
-        case WINDOW_UPDATE:
+        case WINDOW_UPDATE: // 8
             return "WINDOW_UPDATE";
-        case CONTINUATION:
+        case CONTINUATION: // 9
             return "CONTINUATION";
-        case ALTSVC:
+        case ALTSVC: // 10 (0xA)
             return "ALTSVC";
-        case ORIGIN:
+        case ORIGIN: // 12 (0xC)
             return "ORIGIN";
-        case CACHE_DIGEST:
-            return "CACHE_DIGEST";
+        case PRIORITY_UPDATE: // 16 (0x10)
+            return "PRIORITY_UPDATE";
+    }
+
+    switch ((int)t)
+    {
+        case 11:
+            return "11 (0XB)";
+        case 13:
+            return "13 (0xD)";
+        case 14:
+            return "14 (0xE)";
+        case 15:
+            return "15 (0xF)";
     }
 
     return "?";
@@ -576,11 +588,19 @@ void set_frame_data(Stream *resp, int len, int flag)
 //======================================================================
 int set_frame_data(Connect *con, Stream *resp)
 {
+    resp->data.init();
+    long data_len = 0;
+    long min_window_size = (con->h2.connect_window_size > resp->stream_window_size) ? resp->stream_window_size : con->h2.connect_window_size;
+    if (min_window_size <= 0)
+    {
+        print_err(resp, "<%s:%d> !!! connect_window_size=%ld, stream_window_size=%ld, id=%d\n", __func__, __LINE__, con->h2.connect_window_size, resp->stream_window_size, resp->id);
+        return 0;
+    }
+
     if (resp->content == DYN_PAGE)
     {
         if ((resp->create_headers == false) && (resp->send_headers == false))
             return 0;
-        resp->data.init();
         if (resp->html.size_remain())
         {
             int len = resp->html.size_remain();
@@ -611,15 +631,6 @@ int set_frame_data(Connect *con, Stream *resp)
     }
     else
     {
-        resp->data.init();
-        long data_len = 0;
-        long win_update = (con->h2.window_update > resp->window_update) ? resp->window_update : con->h2.window_update;
-        if (win_update <= 0)
-        {
-            print_err(resp, "<%s:%d> !!! h2.window_update=%ld, resp->window_update=%ld, id=%d\n", __func__, __LINE__, con->h2.window_update, resp->window_update, resp->id);
-            return 0;
-        }
-
         if (resp->content == REGFILE)
         {
             if (resp->send_cont_length > conf->DataBufSize)
@@ -631,10 +642,10 @@ int set_frame_data(Connect *con, Stream *resp)
                 data_len = (int)resp->send_cont_length;
             }
 
-            if (data_len > win_update)
+            if (data_len > min_window_size)
             {
-                //print_err(con, "<%s:%d> !!! data_len(%ld) > win_update(%ld), id=%d\n", __func__, __LINE__, data_len, win_update, resp->id);
-                data_len = win_update;
+                //print_err(con, "<%s:%d> !!! data_len(%ld) > min_window_size(%ld), id=%d\n", __func__, __LINE__, data_len, min_window_size, resp->id);
+                data_len = min_window_size;
             }
 
             resp->send_cont_length -= data_len;
@@ -671,8 +682,8 @@ int set_frame_data(Connect *con, Stream *resp)
                 data_len = (int)resp->send_cont_length;
             }
 
-            if (data_len > win_update)
-                data_len = win_update;
+            if (data_len > min_window_size)
+                data_len = min_window_size;
 
             resp->send_cont_length -= data_len;
 
@@ -695,7 +706,6 @@ int set_frame_data(Connect *con, Stream *resp)
 int set_response(Connect *con, Stream *resp)
 {
     resp->send_bytes = 0;
-
     string path = ".";
     decode(resp->path.c_str(), resp->path.size(), resp->decode_path);
     //--------------------------
@@ -704,15 +714,23 @@ int set_response(Connect *con, Stream *resp)
     if (p)
     {
         len = p - resp->decode_path.c_str();
-        if (len > 1024)
+        if (len > (resp->size_uri - 1))
         {
-            return -1;
+            resp_414(resp);
+            return 0;
         }
 
         resp->cgi.query_string = p + 1;
     }
     else
         len = resp->decode_path.size();
+
+    if (len > (resp->size_uri - 1))
+    {
+        print_err(con, "<%s:%d> Error: 414 URI Too Long [%d], id=%d \n", __func__, __LINE__, len, resp->id);
+        resp_414(resp);
+        return 0;
+    }
 
     memcpy(resp->uri, resp->decode_path.c_str(), len);
     resp->uri[len] = 0;
@@ -869,7 +887,8 @@ int set_response(Connect *con, Stream *resp)
         if (err)
         {
             print_err(con, "<%s:%d> Error index_dir(): %d\n", __func__, __LINE__, -err);
-            return -1;
+            resp_500(resp);
+            return 0;
         }
         //------------- headers frame --------------
         set_frame_headers(resp);
@@ -1068,6 +1087,24 @@ void resp_413(Stream *resp)
     }
 
     const char *err = "413 Request entity too large";
+    int len = strlen(err);
+    set_frame_data(resp, len, FLAG_END_STREAM);
+    resp->data.cat(err, len);
+}
+//======================================================================
+void resp_414(Stream *resp)
+{
+    resp->content = ERROR_TYPE;
+    if (resp->send_headers == false)
+    {
+        set_frame_headers(resp);
+        add_header(resp, 8, "414");
+        add_header(resp, 33, get_time().c_str());
+        add_header(resp, 31, "text/plain");
+        resp->create_headers = true;
+    }
+
+    const char *err = "414 URI Too Long";
     int len = strlen(err);
     set_frame_data(resp, len, FLAG_END_STREAM);
     resp->data.cat(err, len);

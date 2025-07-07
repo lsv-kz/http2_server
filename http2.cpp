@@ -179,7 +179,8 @@ int EventHandlerClass::send_window_update(Connect *con)
         return -1;
     }
 
-    con->h2.server_window_size = 0;
+    con->h2.cgi_window_size += con->h2.cgi_window_update;
+    con->h2.cgi_window_update = 0;
     con->sock_timer = 0;
     con->h2.frame_win_update.init();
     con->h2.send_ready &= (~FRAME_WINUPDATE_CONNECT_READY);
@@ -199,6 +200,7 @@ int EventHandlerClass::send_window_update(Connect *con, Stream *resp)
         return -1;
     }
 
+    resp->cgi.windows_size += resp->cgi.window_update;
     resp->cgi.window_update = 0;
     con->sock_timer = 0;
     resp->frame_win_update.init();
@@ -209,21 +211,28 @@ int EventHandlerClass::send_window_update(Connect *con, Stream *resp)
 //======================================================================
 int EventHandlerClass::recv_from_client(Connect *con)
 {
-    con->h2.init();
-    int n = read_from_client(con, con->h2.header + con->h2.header_len, 9 - con->h2.header_len);
-    if (n < 0)
+    if (con->h2.header_len < 9)
     {
-        if (n == ERR_TRY_AGAIN)
+        if (con->h2.header_len == 0)
+            con->h2.init();
+        int n = read_from_client(con, con->h2.header + con->h2.header_len, 9 - con->h2.header_len);
+        if (n < 0)
         {
-            return 0;
+            if (n == ERR_TRY_AGAIN)
+            {
+                return 0;
+            }
+            else
+            {
+                print_err(con, "<%s:%d> Error read_from_client\n", __func__, __LINE__);
+                return -1;
+            }
         }
-        else
-        {
-            print_err(con, "<%s:%d> Error read_from_client\n", __func__, __LINE__);
-            return -1;
-        }
+
+        con->h2.header_len += n;
     }
-    else if (n == 9)
+
+    if (con->h2.header_len == 9)
     {
         if (conf->PrintDebugMsg)
             hex_print_stderr(__func__, __LINE__, con->h2.header, 9);
@@ -234,28 +243,31 @@ int EventHandlerClass::recv_from_client(Connect *con)
         con->h2.flags = con->h2.header[4];
         con->h2.id = (((unsigned char)con->h2.header[5] & 0x7f)<<16) + ((unsigned char)con->h2.header[6]<<16) +
             ((unsigned char)con->h2.header[7]<<8) + (unsigned char)con->h2.header[8];
-        con->h2.init();
 
         char buf[con->h2.body_len];
         if (con->h2.body_len > 0)
         {
             int read_body = read_from_client(con, buf, con->h2.body_len);
-            if (read_body != con->h2.body_len)
+            if (read_body < 0)
             {
                 if (read_body == ERR_TRY_AGAIN)
                 {
+                    print_err(con, "<%s:%d> Error (SSL_ERROR_WANT_READ) read frame %s id=%d\n", __func__, __LINE__, get_str_frame_type(con->h2.type), con->h2.id);
                     return 0;
                 }
 
-                if (con->h2.type == HEADERS) /* -------------- */
-                {
-                    send_rst_stream(con, con->h2.id);
-                }
-
+                print_err(con, "<%s:%d> Error read frame %s id=%d\n", __func__, __LINE__, get_str_frame_type(con->h2.type), con->h2.id);
                 return -1;
             }
 
             con->h2.body.cat(buf, read_body);
+            con->h2.body_len -= read_body;
+            if (con->h2.body_len == 0)
+                con->h2.header_len = 0;
+        }
+        else if (con->h2.body_len == 0)
+        {
+            con->h2.header_len = 0;
         }
 
         if (con->h2.type == SETTINGS)
@@ -263,11 +275,11 @@ int EventHandlerClass::recv_from_client(Connect *con)
             con->sock_timer = 0;
             if (conf->PrintDebugMsg)
             {
-                hex_print_stderr("recv SETTINGS", __LINE__, con->h2.header, 9);
+                //hex_print_stderr("recv SETTINGS", __LINE__, con->h2.header, 9);
                 hex_print_stderr("recv SETTINGS", __LINE__, con->h2.body.ptr(), con->h2.body.size());
             }
 
-            for (int i = 0; i < (con->h2.body_len/6); ++i)
+            for (int i = 0; i < (con->h2.body.size()/6); ++i)
             {
                 int ind = i * 6;
                 if (buf[ind + 1] == 4)
@@ -276,7 +288,9 @@ int EventHandlerClass::recv_from_client(Connect *con)
                     con->h2.init_window_size += ((unsigned char)buf[ind + 4]<<8);
                     con->h2.init_window_size += ((unsigned char)buf[ind + 3]<<16);
                     con->h2.init_window_size += ((unsigned char)buf[ind + 2]<<24);
-                    con->h2.window_update = con->h2.init_window_size;
+                    con->h2.connect_window_size = con->h2.init_window_size;
+                    if (conf->PrintDebugMsg)
+                        print_err(con, "<%s:%d> SETTINGS_INITIAL_WINDOW_SIZE [%ld] id=%d \n", __func__, __LINE__, con->h2.connect_window_size, 0);
                 }
             }
 
@@ -299,12 +313,12 @@ int EventHandlerClass::recv_from_client(Connect *con)
             Stream *resp = con->h2.get(con->h2.id);
             if (!resp)
             {
-                print_err(con, "<%s:%d> Error list.get(id=%d), h2.body_len=%d, flag=%d\n", __func__, __LINE__,
-                                con->h2.id, con->h2.body_len, (int)con->h2.header[4]);
-                return -1;
+                print_err(con, "<%s:%d> Error list.get(id=%d), h2.body.size()=%d, flag=%d\n", __func__, __LINE__,
+                                con->h2.id, con->h2.body.size(), (int)con->h2.header[4]);
+                return 0;
             }
 
-            if ((con->h2.body_len == 0) && (con->h2.header[4] == 1))
+            if ((con->h2.body.size() == 0) && (con->h2.header[4] == 1))
             {
                 if ((resp->cgi.cgi_type <= PHPCGI) || (resp->cgi.cgi_type == SCGI))
                 {
@@ -320,38 +334,44 @@ int EventHandlerClass::recv_from_client(Connect *con)
             if (con->h2.header[4] & FLAG_END_STREAM)
             {
                 resp->cgi.end_post_data = true;
+                if (conf->PrintDebugMsg)
+                    print_err(resp, "<%s:%d>  DATA FLAG_END_STREAM %d, con.cgi_window_size=%ld, stream.cgi_windows_size=%ld, id=%d \n", __func__, __LINE__, con->h2.body.size(), con->h2.cgi_window_size, resp->cgi.windows_size, resp->id);
             }
 
+            int body_len = con->h2.body.size();
             const char *p_buf = NULL;
             if (con->h2.header[4] & FLAG_PADDED)
             {
                 unsigned int padd = (unsigned char)buf[0];
-                con->h2.body_len -= padd;
+                body_len -= padd;
                 p_buf = buf + 1;
             }
             else
                 p_buf = buf;
             if (conf->PrintDebugMsg)
             {
-                if (con->h2.body_len < 100)
-                    print_err(resp, "<%s:%d> +++ DATA %d, con.serv_wind_size=%ld, stream.wind_update=%ld, id=%d \n", __func__, __LINE__, con->h2.body_len, con->h2.server_window_size, resp->cgi.window_update, resp->id);
+                if (body_len < 100)
+                    print_err(resp, "<%s:%d> +++ DATA %d, con.cgi_window_size=%ld, stream.cgi_windows_size=%ld, id=%d \n", __func__, __LINE__, body_len, con->h2.cgi_window_size, resp->cgi.windows_size, resp->id);
             }
 
-            con->h2.server_window_size += con->h2.body_len;
-            resp->cgi.window_update += con->h2.body_len;
+            con->h2.cgi_window_size -= body_len;
+            resp->cgi.windows_size -= body_len;
+
+            con->h2.cgi_window_update += body_len;
+            resp->cgi.window_update += body_len;
 
             if ((resp->cgi.cgi_type <= PHPCGI) || (resp->cgi.cgi_type == SCGI))
             {
-                resp->post_data.cat(p_buf, con->h2.body_len);
+                resp->post_data.cat(p_buf, body_len);
             }
             else if ((resp->cgi.cgi_type == FASTCGI) || (resp->cgi.cgi_type == PHPFPM))
             {
                 char s[8];
-                fcgi_set_header(s, FCGI_STDIN, con->h2.body_len);
+                fcgi_set_header(s, FCGI_STDIN, body_len);
                 resp->post_data.cat(s, 8);
-                if (con->h2.body_len)
+                if (body_len)
                 {
-                    resp->post_data.cat(p_buf, con->h2.body_len);
+                    resp->post_data.cat(p_buf, body_len);
                     if (resp->cgi.end_post_data)
                         resp->post_data.cat("\1\5\0\1\0\0\0\0", 8);
                 }
@@ -361,13 +381,13 @@ int EventHandlerClass::recv_from_client(Connect *con)
                     print_err(resp, "<%s:%d> !!! resp->cgi.fcgiContentLen=%d, id=%d \n", __func__, __LINE__,
                             resp->cgi.fcgiContentLen, resp->id);
                 }
-                resp->cgi.fcgiContentLen += con->h2.body_len;
+                resp->cgi.fcgiContentLen += body_len;
             }
 
             if (resp->post_cont_length < 0)
             {
-                print_err(resp, "<%s:%d> !!! Error: cont_length=%lld, h2.body_len=%d, size=%d, id=%d \n", __func__, __LINE__,
-                            resp->post_cont_length, con->h2.body_len, resp->post_data.size(), resp->id);
+                print_err(resp, "<%s:%d> !!! Error: cont_length=%lld, body_len=%d, size=%d, id=%d \n", __func__, __LINE__,
+                            resp->post_cont_length, body_len, resp->post_data.size(), resp->id);
                 send_rst_stream(con, con->h2.id);
                 close_stream(con, con->h2.id);
                 return -1;
@@ -389,12 +409,10 @@ int EventHandlerClass::recv_from_client(Connect *con)
             if (set_response(con, resp))
             {
                 print_err(resp, "<%s:%d> !!! Error set_response id=%d \n", __func__, __LINE__, con->h2.id);
-                send_rst_stream(con, con->h2.id);
-                close_stream(con, con->h2.id);
                 return 0;
             }
 
-            //if (conf->PrintDebugMsg)
+            if (conf->PrintDebugMsg)
                 print_err(resp, "\"%s\" new request headers.size=%d, id=%d \n", resp->decode_path.c_str(), resp->headers.size(), resp->id);
         }
         else if (con->h2.type == GOAWAY)
@@ -429,9 +447,9 @@ int EventHandlerClass::recv_from_client(Connect *con)
 
             if (con->h2.id == 0)
             {
-                con->h2.window_update += n;
+                con->h2.connect_window_size += n;
                 if (conf->PrintDebugMsg)
-                    print_err(con, "<%s:%d> WINDOW_UPDATE %ld[%ld] id=%d \n", __func__, __LINE__, n, con->h2.window_update, con->h2.id);
+                    print_err(con, "<%s:%d> WINDOW_UPDATE %ld[%ld] id=%d \n", __func__, __LINE__, n, con->h2.connect_window_size, con->h2.id);
             }
             else
             {
@@ -460,7 +478,7 @@ int EventHandlerClass::recv_from_client(Connect *con)
         {
             con->sock_timer = 0;
             //if (conf->PrintDebugMsg)
-                print_err(con, "<%s:%d> frame type: %d, id=%d \n", __func__, __LINE__, con->h2.type, con->h2.id);
+                print_err(con, "<%s:%d> frame type: %s, id=%d \n", __func__, __LINE__, get_str_frame_type(con->h2.type), con->h2.id);
         }
     }
     else
@@ -468,19 +486,20 @@ int EventHandlerClass::recv_from_client(Connect *con)
         print_err(con, "<%s:%d> Error read frame header\n", __func__, __LINE__);
         return -1;
     }
+
     return 0;
 }
 //======================================================================
 void EventHandlerClass::http2_worker_streams(Connect *con)
 {
-    if (con->h2.server_window_size > 0)
+    if (con->h2.cgi_window_update > 0)
     {
-        if (con->h2.server_window_size > 32000)
+        if (con->h2.cgi_window_update > 32000)
         {
-            print_err(con, "<%s:%d> ??? con->h2.server_window_size(%ld) > 16000\n", __func__, __LINE__, con->h2.server_window_size);
+            print_err(con, "<%s:%d> ??? con->h2.server_window_size(%ld) > 16000\n", __func__, __LINE__, con->h2.cgi_window_update);
         }
 
-        set_frame_window_update(con, con->h2.server_window_size);
+        set_frame_window_update(con, con->h2.cgi_window_update);
         if (send_window_update(con) < 0)
         {
             ssl_shutdown(con);
@@ -600,15 +619,15 @@ int EventHandlerClass::send_response(Connect *con, Stream *resp)
         }
         else
         {
-            if (con->h2.window_update <= 0)
+            if (con->h2.connect_window_size <= 0)
             {
-                //print_err(resp, "<%s:%d> !!! h2.window_update(%ld) <= 0, id=%d \n", __func__, __LINE__, con->h2.window_update, resp->id);
+                //print_err(resp, "<%s:%d> !!! connect_window_size(%ld) <= 0, id=%d \n", __func__, __LINE__, con->h2.connect_window_size, resp->id);
                 return 0;
             }
 
-            if (resp->window_update <= 0)
+            if (resp->stream_window_size <= 0)
             {
-                //print_err(resp, "<%s:%d> !!! window_update(%ld) <= 0, %ld, id=%d \n", __func__, __LINE__, resp->window_update, con->h2.window_update, resp->id);
+                //print_err(resp, "<%s:%d> !!! stream_window_size(%ld) <= 0, %ld, id=%d \n", __func__, __LINE__, resp->stream_window_size, con->h2.connect_window_size, resp->id);
                 return 0;
             }
 
@@ -638,8 +657,8 @@ int EventHandlerClass::send_response(Connect *con, Stream *resp)
     resp->send_ready &= (~FRAME_DATA_READY);
     con->sock_timer = 0;
     resp->send_bytes += (ret - 9);
-    resp->window_update -= (ret - 9);
-    con->h2.window_update -= (ret - 9);
+    resp->stream_window_size -= (ret - 9);
+    con->h2.connect_window_size -= (ret - 9);
 
     if (ret != resp->data.size())
     {

@@ -84,6 +84,9 @@ void EventHandlerClass::create_message(Stream *r, int status)
         case RS404:
             resp_404(r);
             break;
+        case RS414:
+            resp_414(r);
+            break;
         case RS500:
             resp_500(r);
             break;
@@ -465,10 +468,10 @@ int EventHandlerClass::set_poll()
             else // h2.type_op = WORK_STREAM
             {
                 poll_fd[num_wait].events = POLLIN;
-                if (c->h2.window_update <= 0)
+                if (c->h2.connect_window_size <= 0)
                 {
                     if (conf->PrintDebugMsg)
-                        print_err(c, "<%s:%d> h2.window_update <= 0\n", __func__, __LINE__);
+                        print_err(c, "<%s:%d> connect_window_size <= 0\n", __func__, __LINE__);
                     conn_array[num_wait++] = c;
                     continue;
                 }
@@ -484,7 +487,7 @@ int EventHandlerClass::set_poll()
                 for ( int i = 0; resp; resp = resp_next, i++)
                 {
                     resp_next = resp->next;
-                    if (resp->frame_win_update.size() || resp->headers.size() || (resp->window_update > 0) || resp->rst_stream)
+                    if (resp->frame_win_update.size() || resp->headers.size() || (resp->stream_window_size > 0) || resp->rst_stream)
                     {
                         poll_fd[num_wait].events |= POLLOUT;
                         break;

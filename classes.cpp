@@ -3,9 +3,9 @@
 //======================================================================
 Stream *http2::add()
 {
-    if (len_ >= size_)
+    if (num_streams >= max_streams)
     {
-        print_err("<%s:%d> Error: num streams: %d\n", __func__, __LINE__, len_);
+        print_err("<%s:%d> Error: num streams: %d\n", __func__, __LINE__, num_streams);
         return NULL;
     }
 
@@ -30,12 +30,12 @@ Stream *http2::add()
 
     if (init_window_size > 0)
     {
-        resp->window_update = init_window_size;
+        resp->stream_window_size = init_window_size;
     }
     else
     {
-        resp->window_update = 65535;
-        window_update = 65535;
+        resp->stream_window_size = 65535;
+        connect_window_size = 65535;
     }
 
     int ret = parse(resp);
@@ -53,7 +53,7 @@ Stream *http2::add()
     }
     else
         start = end = resp;
-    ++len_;
+    ++num_streams;
     return resp;
 }
 //------------------------------------------------------------------
@@ -76,7 +76,7 @@ void http2::del_from_list(Stream *r)
     }
     else if (!r->prev && !r->next)
         start = end = NULL;
-    --len_;
+    --num_streams;
 }
 //------------------------------------------------------------------
 int http2::close_stream(http2 *h2, int id, int *num_cgi)
@@ -128,7 +128,7 @@ int http2::set_window_size(unsigned long num_conn, int id, long n)
         next = r->next;
         if (r->id == id)
         {
-            r->window_update += n;
+            r->stream_window_size += n;
             return id;
         }
     }
@@ -162,7 +162,7 @@ Stream *http2::get()
 //------------------------------------------------------------------
 int http2::size()
 {
-    return len_;
+    return num_streams;
 }
 //------------------------------------------------------------------
 int http2::pow_(int x, int y)

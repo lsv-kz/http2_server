@@ -20,7 +20,7 @@ struct Param
 enum FRAME_TYPE
 {
     DATA, HEADERS, PRIORITY, RST_STREAM, SETTINGS, PUSH_PROMISE, PING,
-    GOAWAY, WINDOW_UPDATE, CONTINUATION, ALTSVC, ORIGIN = 0x0C, CACHE_DIGEST,
+    GOAWAY, WINDOW_UPDATE, CONTINUATION, ALTSVC, ORIGIN = 0x0C, PRIORITY_UPDATE = 0x10,
 };
 
 enum HTTP2_FLAGS { FLAG_ACK = 0x1, FLAG_END_STREAM = 0x1, FLAG_END_HEADERS = 0x4, FLAG_PADDED = 0x8, FLAG_PRIORITY = 0x20 };
@@ -141,12 +141,11 @@ struct Stream
     int flags;
     time_t Time;
 
-    long window_update;
-
     std::string method;
     std::string path;
     std::string decode_path;
-    char uri[4096];
+    char uri[2048];
+    int size_uri;
 
     std::string authority;
     std::string host;
@@ -168,6 +167,7 @@ struct Stream
     long long send_cont_length;
     long long post_cont_length;
     long long file_size;
+    long stream_window_size;
 
     CONTENT_TYPE content;
     int fd;
@@ -217,6 +217,7 @@ struct Stream
         long recv_from_cgi;
         long send_to_cgi;
         long window_update;
+        long windows_size;
     } cgi;
 
     Stream()
@@ -224,10 +225,11 @@ struct Stream
         numConn = numReq = 0;
         status = 0;
         uri[0] = 0;
+        size_uri = (int)sizeof(uri);
         id = 0;
         Time = time(NULL);
         fd = -1;
-        window_update = 0;
+        stream_window_size = 0;
         rst_stream = create_headers = send_headers = send_end_stream = false;
         send_ready = 0;
         offset = 0;
@@ -241,6 +243,7 @@ struct Stream
         cgi.timer = 0;
         cgi.send_to_cgi = cgi.recv_from_cgi = 0;
         cgi.window_update = 0;
+        cgi.windows_size = 0;
     }
 
     ~Stream()
@@ -248,8 +251,8 @@ struct Stream
         //if (conf->PrintDebugMsg == 'y')
         {
             if ((send_bytes != file_size) && (content == REGFILE))
-                print_err("<%s:%d> !!! ~Resp(%s), send_bytes=%lld(%lld), wind_update=%ld, id=%d\n", 
-                        __func__, __LINE__, uri, send_bytes, file_size, window_update, id);
+                print_err("<%s:%d> !!! ~Resp(%s), send_bytes=%lld(%lld), stream_window_size=%ld, id=%d\n", 
+                        __func__, __LINE__, uri, send_bytes, file_size, stream_window_size, id);
         }
 
         if (fd > 0)

@@ -108,8 +108,6 @@ struct http2
     char remoteAddr[NI_MAXHOST];
     char remotePort[NI_MAXSERV];
 
-    long init_window_size;
-    long max_frame_size;
     OPERATION_HTTP2 type_op;
 
     int body_len;
@@ -117,8 +115,10 @@ struct http2
     int flags;
     int id;
 
-    long window_update;
-    long server_window_size;
+    long init_window_size;
+    long connect_window_size;
+    long max_frame_size;
+    long cgi_window_update, cgi_window_size;
 
     char header[9];
     int header_len;
@@ -140,11 +140,6 @@ struct http2
         body.init();
     }
 
-    void init(int n)
-    {
-        size_ = n;
-    }
-
     Stream *add();
     void del_from_list(Stream *r);
     int close_stream(http2 *h2, int id, int *num_cgi);
@@ -160,15 +155,16 @@ struct http2
     {
         ack_recv = false;
         header_len = id = body_len = 0;
-        window_update = 0;
+        connect_window_size = 0;
         init_window_size = 0;
-        server_window_size = 0;
+        cgi_window_update = 0;
+        cgi_window_size = 0;
         max_frame_size = 0;
         num_cgi = 0;
         send_ready = 0;
 
-        size_ = conf->MaxConcurrentStreams;
-        len_ = err = 0;
+        max_streams = conf->MaxConcurrentStreams;
+        num_streams = err = 0;
         start = end = NULL;
 
         settings.cpy("\x00\x00\x12\x04\x00\x00\x00\x00\x00" // SETTINGS (type=0x4)
@@ -197,8 +193,8 @@ struct http2
 private:
 
     HuffmanCode huff;
-    int size_;    //SETTINGS_MAX_CONCURRENT_STREAMS (0x3)
-    int len_;
+    int max_streams;    //SETTINGS_MAX_CONCURRENT_STREAMS (0x3)
+    int num_streams;
     int err;
 
     http2(const http2&);
@@ -379,6 +375,7 @@ void resp_403(Stream *resp);
 void resp_404(Stream *resp);
 void resp_411(Stream *resp);
 void resp_413(Stream *resp);
+void resp_414(Stream *resp);
 void resp_500(Stream *resp);
 void resp_502(Stream *resp);
 void resp_504(Stream *resp);
