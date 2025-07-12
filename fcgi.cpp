@@ -233,7 +233,7 @@ int fcgi_create_connect(Stream *resp)
 {
     if ((resp->cgi.cgi_type != PHPFPM) && (resp->cgi.cgi_type != FASTCGI))
     {
-        print_err(resp, "<%s:%d> ? req->scriptType=%d\n", __func__, __LINE__, resp->cgi.cgi_type);
+        print_err(resp, "<%s:%d> ? req->scriptType=%d \n", __func__, __LINE__, resp->cgi.cgi_type);
         return -RS500;
     }
 
@@ -301,7 +301,7 @@ void EventHandlerClass::fcgi_worker(Connect* con, Stream *resp, struct pollfd *p
         }
         else if (revents != 0)
         {
-            print_err(resp, "<%s:%d> Error 0x%02X(0x%02X), fd=%d, id=%d\n", __func__, __LINE__, 
+            print_err(resp, "<%s:%d> Error 0x%02X(0x%02X), fd=%d, id=%d \n", __func__, __LINE__, 
                         poll_fd->revents, poll_fd->events, poll_fd->fd, resp->id);
             create_message(resp, RS502);
         }
@@ -345,7 +345,7 @@ void EventHandlerClass::fcgi_worker(Connect* con, Stream *resp, struct pollfd *p
         }
         else
         {
-            print_err(resp, "<%s:%d> FASTCGI_PARAMS Error revents=0x%02X: %s; id=%d\n", __func__, __LINE__, revents, resp->id);
+            print_err(resp, "<%s:%d> FASTCGI_PARAMS Error revents=0x%02X: %s; id=%d \n", __func__, __LINE__, revents, resp->id);
             create_message(resp, RS502);
         }
     }
@@ -353,7 +353,7 @@ void EventHandlerClass::fcgi_worker(Connect* con, Stream *resp, struct pollfd *p
     {
         if (revents != POLLOUT)
         {
-            print_err(resp, "<%s:%d> FASTCGI_STDIN Error revents=0x%02X: %s; id=%d\n", __func__, __LINE__, revents, resp->id);
+            print_err(resp, "<%s:%d> FASTCGI_STDIN Error revents=0x%02X: %s; id=%d \n", __func__, __LINE__, revents, resp->id);
             create_message(resp, RS502);
             return;
         }
@@ -363,7 +363,7 @@ void EventHandlerClass::fcgi_worker(Connect* con, Stream *resp, struct pollfd *p
         {
             if (errno != EAGAIN)
             {
-                print_err(resp, "<%s:%d> Error write()=%d: %s; id=%d\n", __func__, __LINE__, ret, strerror(errno), resp->id);
+                print_err(resp, "<%s:%d> Error write()=%d: %s; id=%d \n", __func__, __LINE__, ret, strerror(errno), resp->id);
                 resp->post_data.init();
                 create_message(resp, RS502);
             }
@@ -373,7 +373,7 @@ void EventHandlerClass::fcgi_worker(Connect* con, Stream *resp, struct pollfd *p
         resp->cgi.send_to_cgi += ret;
         if (ret != resp->post_data.size_remain())
         {
-            print_err(resp, "<%s:%d> !!! Error write()=%d(%d); id=%d\n", __func__, __LINE__, ret, resp->post_data.size_remain(), resp->id);
+            print_err(resp, "<%s:%d> !!! Error write()=%d(%d); id=%d \n", __func__, __LINE__, ret, resp->post_data.size_remain(), resp->id);
             resp->post_data.set_offset(ret);
             resp->cgi.timer = 0;
         }
@@ -395,7 +395,7 @@ void EventHandlerClass::fcgi_worker(Connect* con, Stream *resp, struct pollfd *p
     {
         if (revents != POLLIN)
         {
-            print_err(resp, "<%s:%d> FASTCGI_STDOUT Error revents=0x%02X: %s; id=%d\n", __func__, __LINE__, revents, resp->id);
+            print_err(resp, "<%s:%d> FASTCGI_STDOUT Error revents=0x%02X: %s; id=%d \n", __func__, __LINE__, revents, resp->id);
             create_message(resp, RS502);
             return;
         }
@@ -405,6 +405,13 @@ void EventHandlerClass::fcgi_worker(Connect* con, Stream *resp, struct pollfd *p
             if (resp->cgi.fcgiPaddingLen > 0)
             {
                 char s[256];
+                if (resp->cgi.fcgiPaddingLen > (int)sizeof(s))
+                {
+                    resp->post_data.init();
+                    create_message(resp, RS502);
+                    return;
+                }
+
                 int ret = read(fd, s, resp->cgi.fcgiPaddingLen);
                 if (ret <= 0)
                 {

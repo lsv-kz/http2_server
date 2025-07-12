@@ -44,19 +44,19 @@ Stream *http2::add()
         return NULL;
     }
 
-    resp->prev = end;
+    resp->prev = end_stream;
     resp->next = NULL;
-    if (start)
+    if (start_stream)
     {
-        end->next = resp;
-        end = resp;
+        end_stream->next = resp;
+        end_stream = resp;
     }
     else
-        start = end = resp;
+        start_stream = end_stream = resp;
     ++num_streams;
     return resp;
 }
-//------------------------------------------------------------------
+//----------------------------------------------------------------------
 void http2::del_from_list(Stream *r)
 {
     if (r->prev && r->next)
@@ -67,21 +67,21 @@ void http2::del_from_list(Stream *r)
     else if (r->prev && !r->next)
     {
         r->prev->next = r->next;
-        end = r->prev;
+        end_stream = r->prev;
     }
     else if (!r->prev && r->next)
     {
         r->next->prev = r->prev;
-        start = r->next;
+        start_stream = r->next;
     }
     else if (!r->prev && !r->next)
-        start = end = NULL;
+        start_stream = end_stream = NULL;
     --num_streams;
 }
-//------------------------------------------------------------------
+//----------------------------------------------------------------------
 int http2::close_stream(http2 *h2, int id, int *num_cgi)
 {
-    Stream *r = start, *next = NULL;
+    Stream *r = start_stream, *next = NULL;
     for ( ; r; r = next)
     {
         next = r->next;
@@ -119,10 +119,10 @@ int http2::close_stream(http2 *h2, int id, int *num_cgi)
 
     return -1;
 }
-//------------------------------------------------------------------
+//----------------------------------------------------------------------
 int http2::set_window_size(unsigned long num_conn, int id, long n)
 {
-    Stream *r = start, *next = NULL;
+    Stream *r = start_stream, *next = NULL;
     for ( ; r; r = next)
     {
         next = r->next;
@@ -135,10 +135,10 @@ int http2::set_window_size(unsigned long num_conn, int id, long n)
 
     return id;
 }
-//------------------------------------------------------------------
+//----------------------------------------------------------------------
 Stream *http2::get(int id)
 {
-    Stream *r = start, *next = NULL;
+    Stream *r = start_stream, *next = NULL;
     for ( ; r; r = next)
     {
         next = r->next;
@@ -148,23 +148,23 @@ Stream *http2::get(int id)
 
     return NULL;
 }
-//------------------------------------------------------------------
+//----------------------------------------------------------------------
 Stream *http2::get()
 {
-    if (start)
+    if (start_stream)
     {
-        Stream *rtmp = start;
+        Stream *rtmp = start_stream;
         return rtmp;
     }
     else
         return NULL;
 }
-//------------------------------------------------------------------
+//----------------------------------------------------------------------
 int http2::size()
 {
     return num_streams;
 }
-//------------------------------------------------------------------
+//----------------------------------------------------------------------
 int http2::pow_(int x, int y)
 {
     if (y < 0)
@@ -174,7 +174,7 @@ int http2::pow_(int x, int y)
         m = m * x;
     return m;
 }
-//------------------------------------------------------------------
+//----------------------------------------------------------------------
 int http2::bytes_to_int(unsigned char prefix, const char *s, int *len, int size)
 {
     int pref_len = 0;
@@ -200,7 +200,42 @@ int http2::bytes_to_int(unsigned char prefix, const char *s, int *len, int size)
     }
     return n;
 }
-//------------------------------------------------------------------
+//----------------------------------------------------------------------
+void http2::push_to_list(FrameRedySend *rf)
+{
+    rf->next = NULL;
+    rf->prev = end_frame;
+    if (start_frame)
+    {
+        end_frame->next = rf;
+        end_frame = rf;
+    }
+    else
+        start_frame = end_frame = rf;
+}
+//----------------------------------------------------------------------
+void http2::del_from_list(FrameRedySend *rf)
+{
+    if (rf->prev && rf->next)
+    {
+        rf->prev->next = rf->next;
+        rf->next->prev = rf->prev;
+    }
+    else if (rf->prev && !rf->next)
+    {
+        rf->prev->next = rf->next;
+        end_frame = rf->prev;
+    }
+    else if (!rf->prev && rf->next)
+    {
+        rf->next->prev = rf->prev;
+        start_frame = rf->next;
+    }
+    else if (!rf->prev && !rf->next)
+        start_frame = end_frame = NULL;
+    delete rf;
+}
+//----------------------------------------------------------------------
 int http2::parse(Stream *r)
 {
     int len = 0;

@@ -97,7 +97,7 @@ void EventHandlerClass::create_message(Stream *r, int status)
             resp_504(r);
             break;
         default:
-            print_err("<%s:%d> Error status=%d, id=%d\n", __func__, __LINE__, status, r->id);
+            print_err("<%s:%d> Error status=%d, id=%d \n", __func__, __LINE__, status, r->id);
             resp_500(r);
             break;
     }
@@ -151,7 +151,7 @@ int EventHandlerClass::cgi_set_poll()
                 resp->cgi.timer = t;
             if ((t - resp->cgi.timer) >= conf->TimeoutCGI)
             {
-                print_err(resp, "<%s:%d> TimeoutCGI=%ld, post_data.size()=%d, cgi.op=%d, id=%d\n", __func__, __LINE__, 
+                print_err(resp, "<%s:%d> TimeoutCGI=%ld, post_data.size()=%d, cgi.op=%d, id=%d \n", __func__, __LINE__, 
                         t - resp->cgi.timer, resp->post_data.size(), resp->cgi.op, resp->id);
                 c->h2.frame_win_update.init();
                 resp->frame_win_update.init();
@@ -337,7 +337,7 @@ int EventHandlerClass::cgi_set_poll()
                 break;
             if (poll_ind >= num_cgi_poll)
             {
-                print_err(c, "<%s:%d> !!! n=%d, poll_ind(%d)>=num_cgi_poll(%d), c->h2.num_cgi=%d,  id=%d\n", __func__, __LINE__, n, poll_ind, num_cgi_poll, c->h2.num_cgi, resp->id);
+                print_err(c, "<%s:%d> !!! n=%d, poll_ind(%d)>=num_cgi_poll(%d), c->h2.num_cgi=%d,  id=%d \n", __func__, __LINE__, n, poll_ind, num_cgi_poll, c->h2.num_cgi, resp->id);
                 exit(11);
             }
 
@@ -346,7 +346,7 @@ int EventHandlerClass::cgi_set_poll()
             if ((fd != resp->cgi.to_script) && (fd != resp->cgi.from_script) && (fd != resp->cgi.fd))
             {
                 if (conf->PrintDebugMsg)
-                    print_err("<%s:%d> revents=0x%02X, fd=%d (fd != cgi.fd),  id=%d\n", __func__, __LINE__, revents, fd, resp->id);
+                    print_err("<%s:%d> revents=0x%02X, fd=%d (fd != cgi.fd),  id=%d \n", __func__, __LINE__, revents, fd, resp->id);
                 continue;
             }
 
@@ -364,7 +364,7 @@ int EventHandlerClass::cgi_set_poll()
                     {
                         if (fd != resp->cgi.from_script)
                         {
-                            print_err(c, "<%s:%d> ??? fd=%d/%d,  id=%d\n", __func__, __LINE__, 
+                            print_err(c, "<%s:%d> ??? fd=%d/%d,  id=%d \n", __func__, __LINE__, 
                                                 fd, resp->cgi.from_script, resp->id);
                             create_message(resp, RS500);
                         }
@@ -447,15 +447,22 @@ int EventHandlerClass::set_poll()
                                 c->ssl_pending, get_str_operation(c->h2.type_op));
                 }
 
-                ret = http2_worker_connections(c);
-                if (ret < 0)
-                    break;
+                if ((c->h2.type_op == RECV_SETTINGS) || (c->h2.type_op == WORK_STREAM))
+                {
+                    if ((ret = recv_frame(c)) < 0)
+                        break;
+                }
+                else if ((c->h2.type_op == SSL_ACCEPT) || (c->h2.type_op == PREFACE_MESSAGE) || (c->h2.type_op == SSL_SHUTDOWN))
+                {
+                    if ((ret = http2_connection(c)) < 0)
+                        break;
+                }
             }
 
             if (ret < 0)
                 continue;
             if (c->h2.next == NULL)
-                c->h2.next = c->h2.start;
+                c->h2.next = c->h2.start_stream;
 
             poll_fd[num_wait].fd = c->clientSocket;
             poll_fd[num_wait].events = 0;
@@ -476,7 +483,7 @@ int EventHandlerClass::set_poll()
                     continue;
                 }
 
-                if (c->h2.frame_win_update.size())
+                if (c->h2.frame_win_update.size() || c->h2.goaway.size() || c->h2.ping.size() || c->h2.start_frame)
                 {
                     poll_fd[num_wait].events |= POLLOUT;
                     conn_array[num_wait++] = c;
@@ -487,7 +494,12 @@ int EventHandlerClass::set_poll()
                 for ( int i = 0; resp; resp = resp_next, i++)
                 {
                     resp_next = resp->next;
-                    if (resp->frame_win_update.size() || resp->headers.size() || (resp->stream_window_size > 0) || resp->rst_stream)
+                    if (resp->frame_win_update.size() || 
+                        resp->headers.size() || 
+                        resp->data.size() || 
+                        resp->stream_window_size || 
+                        resp->rst_stream
+                    )
                     {
                         poll_fd[num_wait].events |= POLLOUT;
                         break;
@@ -558,22 +570,27 @@ int EventHandlerClass::poll_worker()
         con->fd_revents = revents;
         if (poll_fd[conn_ind].revents & POLLIN)
         {
-            if (http2_worker_connections(con) < 0)
+            if ((con->h2.type_op == SSL_ACCEPT) || (con->h2.type_op == PREFACE_MESSAGE) || (con->h2.type_op == SSL_SHUTDOWN))
             {
-                //print_err(con, "<%s:%d> !!! Error: http2_worker_connections()<0, %s\n", __func__, __LINE__, get_str_operation(con->h2.type_op));
-                continue;
+                if (http2_connection(con) < 0)
+                    continue;
+            }
+            else if ((con->h2.type_op == RECV_SETTINGS) || (con->h2.type_op == WORK_STREAM))
+            {
+                if (recv_frame(con) < 0)
+                    continue;
             }
         }
 
         if (poll_fd[conn_ind].revents & POLLOUT)
         {
-            if ((con->h2.type_op == SEND_SETTINGS) || (con->h2.type_op == SSL_ACCEPT) || (con->h2.type_op == SSL_SHUTDOWN))
+            if ((con->h2.type_op == SSL_ACCEPT) || (con->h2.type_op == SSL_SHUTDOWN))
             {
-                http2_worker_connections(con);
+                http2_connection(con);
             }
-            else
+            else if ((con->h2.type_op == SEND_SETTINGS) || (con->h2.type_op == WORK_STREAM))
             {
-                http2_worker_streams(con);
+                send_frames(con);
             }
         }
     }
@@ -581,7 +598,7 @@ int EventHandlerClass::poll_worker()
     return 0;
 }
 //----------------------------------------------------------------------
-int EventHandlerClass::wait_conn()
+int EventHandlerClass::wait_connection()
 {
     {
     unique_lock<mutex> lk(mtx_thr);
@@ -596,7 +613,7 @@ int EventHandlerClass::wait_conn()
     return 0;
 }
 //----------------------------------------------------------------------
-void EventHandlerClass::add_wait_list(Connect *r)
+void EventHandlerClass::push_wait_list(Connect *r)
 {
     r->sock_timer = 0;
     r->next = NULL;
@@ -613,11 +630,6 @@ mtx_thr.unlock();
     cond_thr.notify_one();
 }
 //----------------------------------------------------------------------
-void EventHandlerClass::push_pollin_list(Connect *r)
-{
-    add_wait_list(r);
-}
-//----------------------------------------------------------------------
 void EventHandlerClass::close_event_handler()
 {
     close_thr = 1;
@@ -630,7 +642,7 @@ void event_handler(int n_thr)
 printf(" +++++ worker thread %d run +++++\n", n_thr);
     while (1)
     {
-        if (event_handler_cl.wait_conn())
+        if (event_handler_cl.wait_connection())
             break;
         event_handler_cl.add_work_list();
         event_handler_cl.cgi_set_poll();
@@ -642,9 +654,9 @@ printf(" +++++ worker thread %d run +++++\n", n_thr);
     print_err("<%s:%d> ***** exit thread %d *****\n", __func__, __LINE__, n_thr);
 }
 //======================================================================
-void push_pollin_list(Connect *r)
+void push_wait_list(Connect *r)
 {
-    event_handler_cl.push_pollin_list(r);
+    event_handler_cl.push_wait_list(r);
 }
 //======================================================================
 void close_work_thread()

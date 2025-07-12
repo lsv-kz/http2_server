@@ -312,13 +312,9 @@ int EventHandlerClass::cgi_stdout(Stream *resp, int fd)
     int ret = read(fd, buf, sizeof(buf));
     if (ret == -1)
     {
-        if (errno == EAGAIN)
-        {
-            print_err(resp, "<%s:%d> Error read(): %s\n", __func__, __LINE__, strerror(errno));
-            return ERR_TRY_AGAIN;
-        }
-
         print_err(resp, "<%s:%d> Error read(): %s\n", __func__, __LINE__, strerror(errno));
+        if (errno == EAGAIN)
+            return ERR_TRY_AGAIN;
         return -1;
     }
     else if (ret > 0)
@@ -382,7 +378,7 @@ void EventHandlerClass::cgi_worker(Connect *c, Stream *resp, struct pollfd *poll
         {
             if (resp->cgi.to_script != fd)
             {
-                print_err(resp, "<%s:%d> Error cgi.to_script=%d, fd=%d, id=%d\n", __func__, __LINE__,
+                print_err(resp, "<%s:%d> Error cgi.to_script=%d, fd=%d, id=%d \n", __func__, __LINE__,
                                         resp->cgi.to_script, fd, resp->id);
                 create_message(resp, RS500);
                 return;
@@ -394,7 +390,7 @@ void EventHandlerClass::cgi_worker(Connect *c, Stream *resp, struct pollfd *poll
             int ret = cgi_stdin(resp, fd);
             if (ret == ERR_TRY_AGAIN)
             {
-                print_err(resp, "<%s:%d> Error cgi_stdin ERR_TRY_AGAIN, id=%d\n", __func__, __LINE__, resp->id);
+                print_err(resp, "<%s:%d> Error cgi_stdin ERR_TRY_AGAIN, id=%d \n", __func__, __LINE__, resp->id);
                 return;
             }
             else if (ret < 0)
@@ -406,7 +402,7 @@ void EventHandlerClass::cgi_worker(Connect *c, Stream *resp, struct pollfd *poll
         }
         else if (revents)
         {
-            print_err(resp, "<%s:%d> Error events/revents=0x%02X/0x%02X, fd=%d,   id=%d\n", __func__, __LINE__,
+            print_err(resp, "<%s:%d> Error events/revents=0x%02X/0x%02X, fd=%d,   id=%d \n", __func__, __LINE__,
                     events, revents, fd, resp->id);
             create_message(resp, RS502);
         }
@@ -417,7 +413,7 @@ void EventHandlerClass::cgi_worker(Connect *c, Stream *resp, struct pollfd *poll
         {
             if (resp->cgi.from_script != fd)
             {
-                print_err(resp, "<%s:%d> Error cgi.from_script=%d, fd=%d, 0x%02X,  id=%d\n", __func__, __LINE__,
+                print_err(resp, "<%s:%d> Error cgi.from_script=%d, fd=%d, 0x%02X,  id=%d \n", __func__, __LINE__,
                                         resp->cgi.from_script, fd, revents, resp->id);
                 create_message(resp, RS502);
                 return;
@@ -436,8 +432,7 @@ void EventHandlerClass::cgi_worker(Connect *c, Stream *resp, struct pollfd *poll
             else if (ret < 0)
             {
                 print_err(resp, "<%s:%d> Error cgi_stdout()=%d, id=%d \n", __func__, __LINE__, ret, resp->id);
-                send_rst_stream(c, resp->id);
-                c->h2.close_stream(&c->h2, resp->id, &all_cgi);
+                create_message(resp, RS502);
             }
             else if (ret == 0)
             {

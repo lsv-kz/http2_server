@@ -551,20 +551,44 @@ void set_frame_window_update(Connect *con, int len)
     con->h2.send_ready |= FRAME_WINUPDATE_CONNECT_READY;
 }
 //======================================================================
-int send_rst_stream(Connect *c, int id)
+void set_frame_goaway(Connect *con, int error)
 {
-     c->h2.frame.cpy("\0\0\4\3\0\0\0\0\0"
-                         "\0\0\0\0", 13);
-    c->h2.frame.set_byte((id>>24) & 0x7f, 5);
-    c->h2.frame.set_byte((id>>16) & 0xff, 6);
-    c->h2.frame.set_byte((id>>8) & 0xff, 7);
-    c->h2.frame.set_byte(id & 0xff, 8);
+    char buf[] = "\x0\x0\x0\x0\x0\x0\x0\x0";
+    con->h2.goaway.cpy("\x0\x0\x8\x7\x0\x0\x0\x0\x0", 9);
 
-    if (write_to_client(c, c->h2.frame.ptr(), c->h2.frame.size(), id) <= 0)
+    buf[4] = (unsigned char)((error>>24) & 0xff);
+    buf[5] = (unsigned char)((error>>16) & 0xff);
+    buf[6] = (unsigned char)((error>>8) & 0xff);
+    buf[7] = (unsigned char)(error & 0xff);
+
+    con->h2.goaway.cat(buf, 8);
+}
+//======================================================================
+int set_rst_stream(Connect *c, int id, int error)
+{
+    FrameRedySend *rf = NULL;
+    rf = new(std::nothrow) FrameRedySend;
+    if (!rf)
     {
-        print_err(c, "<%s:%d> Error send frame RST_STREAM\n", __func__, __LINE__);
+        print_err(c, "<%s:%d> Error: %s\n", __func__, __LINE__, strerror(errno));
         return -1;
     }
+
+    c->h2.push_to_list(rf);
+
+    rf->id = id;
+
+    rf->frame.cpy("\0\0\4\3\0\0\0\0\0"
+                         "\0\0\0\0", 13);
+    rf->frame.set_byte((id>>24) & 0x7f, 5);
+    rf->frame.set_byte((id>>16) & 0xff, 6);
+    rf->frame.set_byte((id>>8) & 0xff, 7);
+    rf->frame.set_byte(id & 0xff, 8);
+
+    rf->frame.set_byte((error>>24) & 0xff, 9);
+    rf->frame.set_byte((error>>16) & 0xff, 10);
+    rf->frame.set_byte((error>>8) & 0xff, 11);
+    rf->frame.set_byte(error & 0xff, 12);
 
     return 0;
 }
@@ -593,7 +617,7 @@ int set_frame_data(Connect *con, Stream *resp)
     long min_window_size = (con->h2.connect_window_size > resp->stream_window_size) ? resp->stream_window_size : con->h2.connect_window_size;
     if (min_window_size <= 0)
     {
-        print_err(resp, "<%s:%d> !!! connect_window_size=%ld, stream_window_size=%ld, id=%d\n", __func__, __LINE__, con->h2.connect_window_size, resp->stream_window_size, resp->id);
+        print_err(resp, "<%s:%d> !!! connect_window_size=%ld, stream_window_size=%ld, id=%d \n", __func__, __LINE__, con->h2.connect_window_size, resp->stream_window_size, resp->id);
         return 0;
     }
 
@@ -644,7 +668,7 @@ int set_frame_data(Connect *con, Stream *resp)
 
             if (data_len > min_window_size)
             {
-                //print_err(con, "<%s:%d> !!! data_len(%ld) > min_window_size(%ld), id=%d\n", __func__, __LINE__, data_len, min_window_size, resp->id);
+                //print_err(con, "<%s:%d> !!! data_len(%ld) > min_window_size(%ld), id=%d \n", __func__, __LINE__, data_len, min_window_size, resp->id);
                 data_len = min_window_size;
             }
 

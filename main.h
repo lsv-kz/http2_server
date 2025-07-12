@@ -95,12 +95,24 @@ enum DIRECT { TIME_OUT, FROM_CLIENT, TO_CLIENT };
 //======================================================================
 extern const Config* const conf;
 //======================================================================
+struct FrameRedySend
+{
+    FrameRedySend *prev;
+    FrameRedySend *next;
+    
+    int id;
+    ByteArray frame;
+};
+//======================================================================
 struct http2
 {
-    Stream *start;
-    Stream *end;
+    Stream *start_stream;
+    Stream *end_stream;
 
     Stream *next;
+    
+    FrameRedySend *start_frame;
+    FrameRedySend *end_frame;
 
     unsigned long numConn;
     unsigned long numReq;
@@ -118,10 +130,14 @@ struct http2
     long init_window_size;
     long connect_window_size;
     long max_frame_size;
-    long cgi_window_update, cgi_window_size;
+    long cgi_window_update;
+    long cgi_window_size;
 
     char header[9];
     int header_len;
+
+    ByteArray goaway;
+    ByteArray ping;
 
     ByteArray body;
     ByteArray frame;
@@ -150,22 +166,25 @@ struct http2
     int pow_(int x, int y);
     int bytes_to_int(unsigned char prefix, const char *s, int *len, int size);
     int parse(Stream *r);
+    void push_to_list(FrameRedySend*);
+    void del_from_list(FrameRedySend*);
 
     http2()
     {
         ack_recv = false;
         header_len = id = body_len = 0;
-        connect_window_size = 0;
         init_window_size = 0;
+        connect_window_size = 0;
+        max_frame_size = 0;
         cgi_window_update = 0;
         cgi_window_size = 0;
-        max_frame_size = 0;
         num_cgi = 0;
         send_ready = 0;
 
         max_streams = conf->MaxConcurrentStreams;
         num_streams = err = 0;
-        start = end = NULL;
+        start_stream = end_stream = NULL;
+        start_frame = end_frame = NULL;
 
         settings.cpy("\x00\x00\x12\x04\x00\x00\x00\x00\x00" // SETTINGS (type=0x4)
                     "\x00\x01\x00\x00\x00\x00"              // SETTINGS_HEADER_TABLE_SIZE (0x1)
@@ -181,14 +200,14 @@ struct http2
     ~http2()
     {
         print_err("[%lu] <%s:%d> ~~~~ close connect\n", numConn, __func__, __LINE__);
-        Stream *r = start, *next = NULL;
+        Stream *r = start_stream, *next = NULL;
         for ( ; r; r = next)
         {
             next = r->next;
             delete r;
         }
 
-        start = end = NULL;
+        start_stream = end_stream = NULL;
     }
 private:
 
@@ -250,37 +269,40 @@ class EventHandlerClass
     Connect *wait_list_start;
     Connect *wait_list_end;
 
-    int send_part_file(Connect *c);
     void del_from_list(Connect *c);
 
-    void choose_worker(Connect *c);
     void worker(Connect *c);
 
-    int http2_worker_connections(Connect *c);
-    void http2_worker_streams(Connect *c);
+    int http2_connection(Connect *c);
 
-    int send_html(Connect *c);
-    int recv_from_client(Connect *c);
-    int send_headers(Connect *c, Stream *r);
-    int send_response(Connect *c, Stream *r);
+    int recv_frame(Connect *c);
+    int recv_frame_(Connect *c);
 
-    void cgi_worker(Connect* c, Stream *resp);
+    void send_frames(Connect *c);
+    int send_frames_(Connect *c);
 
+    int send_frame_settings(Connect *c);
+    int send_frame_headers(Connect *c, Stream *r);
+    int send_frame_data(Connect *c, Stream *r);
     int send_window_update(Connect *c);
     int send_window_update(Connect *c, Stream *r);
+    int send_frame_goawey(Connect *c);
+    int send_frame_ping(Connect *c);
+    int send_frame_rststream(Connect *c);
 
+    void cgi_worker(Connect *c, Stream *r, struct pollfd *p);
     int cgi_create_proc(Stream *r);
     int cgi_fork(Stream *r, int* serv_cgi, int* cgi_serv);
     int cgi_stdin(Stream *r, int fd);
     int cgi_stdout(Stream *r, int fd);
-    void cgi_worker(Connect *c, Stream *r, struct pollfd *p);
 
     void scgi_worker(Connect* c, Stream *r, struct pollfd *p);
+
     void fcgi_worker(Connect* c, Stream *r, struct pollfd *p);
     void fcgi_get_headers(Connect* con, Stream *r);
 
     void create_message(Stream *r, int status);
-    
+
     void close_stream(Connect *c, int id);
 
 public:
@@ -289,7 +311,7 @@ public:
     ~EventHandlerClass();
 
     void init(int n);
-    int wait_conn();
+    int wait_connection();
 
     void add_work_list();
 
@@ -299,11 +321,7 @@ public:
     int cgi_set_poll();
     int set_poll();
     int poll_worker();
-    void add_wait_list(Connect *c);
-    void push_send_file(Connect *c);
-    void push_pollin_list(Connect *c);
-    void push_send_multipart(Connect *c);
-    void push_send_html(Connect *c);
+    void push_wait_list(Connect *c);
     void close_event_handler();
 };
 //----------------------------------------------------------------------
@@ -332,6 +350,7 @@ extern char **environ;
 //----------------------------------------------------------------------
 int read_conf_file(const char *path_conf);
 int set_max_fd(int max_open_fd);
+void setDataBufSize(int n);
 //----------------------------------------------------------------------
 int index_dir(Connect *c, std::string& path, Stream *r);
 //----------------------------------------------------------------------
@@ -363,7 +382,8 @@ void add_header(Stream *r, int ind);
 void add_header(Stream *r, int ind, const char *val);
 void set_frame_window_update(Connect *c, int len);
 void set_frame_window_update(Stream *r, int len);
-int send_rst_stream(Connect *c, int id);
+void set_frame_goaway(Connect *c, int error);
+int set_rst_stream(Connect *c, int id, int error);
 int set_response(Connect *c, Stream *r);
 CONTENT_TYPE get_content_type(const char *path);
 int parse_range(const char *s, long long file_size, long long *offset, long long *content_length);
@@ -392,7 +412,7 @@ void print_log(Stream *r);
 void ssl_shutdown(Connect *c);
 void close_connect(Connect *c);
 //----------------------------------------------------------------------
-void push_pollin_list(Connect *c);
+void push_wait_list(Connect *c);
 void event_handler(int);
 void close_work_thread();
 //----------------------------------------------------------------------

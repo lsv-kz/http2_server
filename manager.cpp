@@ -62,6 +62,8 @@ mtx_conn.unlock();
 //======================================================================
 void EventHandlerClass::ssl_shutdown(Connect *conn)
 {
+    if (conf->PrintDebugMsg)
+        print_err(conn, "<%s:%d> ssl_shutdown\n", __func__, __LINE__);
     if (conn->tls.ssl)
     {
         if ((conn->tls.err != SSL_ERROR_SSL) && 
@@ -71,13 +73,13 @@ void EventHandlerClass::ssl_shutdown(Connect *conn)
             for ( int i = 0; i < 2; ++i)
             {
                 int ret = SSL_shutdown(conn->tls.ssl);
-                if (conf->PrintDebugMsg)
-                {
+                //if (conf->PrintDebugMsg)
                     print_err(conn, "<%s:%d> SSL_shutdown()=%d\n", __func__, __LINE__, ret);
-                }
                 if (ret == -1)
                 {
                     conn->tls.err = SSL_get_error(conn->tls.ssl, ret);
+                    //if (conf->PrintDebugMsg)
+                        print_err(conn, "<%s:%d> Error SSL_accept()=%d: %s\n", __func__, __LINE__, ret, ssl_strerror(conn->tls.err));
                     if (conn->tls.err == SSL_ERROR_ZERO_RETURN)
                     {
                         close_connect(conn);
@@ -85,14 +87,12 @@ void EventHandlerClass::ssl_shutdown(Connect *conn)
                     }
                     else if (conn->tls.err == SSL_ERROR_WANT_READ)
                     {
-                        //print_err(conn, "<%s:%d> SSL_ERROR_WANT_READ\n", __func__, __LINE__);
                         conn->tls.poll_event = POLLIN;
                         conn->sock_timer = 0;
                         return;
                     }
                     else if (conn->tls.err == SSL_ERROR_WANT_WRITE)
                     {
-                        //print_err(conn, "<%s:%d> SSL_ERROR_WANT_WRITE\n", __func__, __LINE__);
                         conn->tls.poll_event = POLLOUT;
                         conn->sock_timer = 0;
                         return;
@@ -264,7 +264,7 @@ void manager(int sockServer)
         req->h2.type_op = SSL_ACCEPT;
         req->h2.next = NULL;
         start_conn();
-        push_pollin_list(req);
+        push_wait_list(req);
     }
 
     close_work_thread();

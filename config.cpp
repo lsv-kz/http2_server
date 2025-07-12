@@ -434,7 +434,7 @@ int read_conf_file(FILE *fconf)
         return -1;
     }
     //------------------------------------------------------------------
-    if (conf->DataBufSize <= 0)
+    if ((conf->DataBufSize <= 0) || (conf->DataBufSize > 16384))
     {
         fprintf(stderr, "<%s:%d> Error: DataBufSize=%d\n", __func__, __LINE__, conf->DataBufSize);
         exit(1);
@@ -601,4 +601,9 @@ int set_max_fd(int max_open_fd)
 void free_fcgi_list()
 {
     c.free_fcgi_list();
+}
+//======================================================================
+void setDataBufSize(int n)
+{
+    c.DataBufSize = n;
 }

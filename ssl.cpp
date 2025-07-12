@@ -203,8 +203,14 @@ int ssl_write(Connect *con, const char *buf, int len, int id)
             con->tls.err = 0;
             return ERR_TRY_AGAIN;
         }
-        print_err(con, "<%s:%d> Error SSL_write(, %p, %d)=%d: %s, errno=%d, id=%d\n", __func__, __LINE__,
-                    buf, len, ret, ssl_strerror(con->tls.err), errno, id);
+        print_err(con, "<%s:%d> Error SSL_write(, , %d)=%d: %s, errno=%d, id=%d\n", __func__, __LINE__,
+                                    len, ret, ssl_strerror(con->tls.err), errno, id);
+        return -1;
+    }
+
+    if (ret != len)
+    {
+        print_err(con, "<%s:%d> Error size(%d) != (SSL_write()=%d), id=%d\n", __func__, __LINE__, len, ret, id);
         return -1;
     }
 
