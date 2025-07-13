@@ -94,6 +94,7 @@ enum DIRECT { TIME_OUT, FROM_CLIENT, TO_CLIENT };
 #define requestId               1
 //======================================================================
 extern const Config* const conf;
+void print_log(Stream *r);
 //======================================================================
 struct FrameRedySend
 {
@@ -158,7 +159,7 @@ struct http2
 
     Stream *add();
     void del_from_list(Stream *r);
-    int close_stream(http2 *h2, int id, int *num_cgi);
+    int close_stream(http2 *h2, int id);
     int set_window_size(unsigned long num_conn, int id, long n);
     Stream *get(int id);
     Stream *get();
@@ -173,7 +174,7 @@ struct http2
     {
         ack_recv = false;
         header_len = id = body_len = 0;
-        init_window_size = 0;
+        init_window_size = 65535;
         connect_window_size = 0;
         max_frame_size = 0;
         cgi_window_update = 0;
@@ -204,6 +205,9 @@ struct http2
         for ( ; r; r = next)
         {
             next = r->next;
+            print_log(r);
+            //if (conf->PrintDebugMsg)
+                print_err("<%s:%d>~~~~~~~ Close Stream, id=%d \n", __func__, __LINE__, r->id);
             delete r;
         }
 
@@ -303,7 +307,7 @@ class EventHandlerClass
 
     void create_message(Stream *r, int status);
 
-    void close_stream(Connect *c, int id);
+    void close_stream(Connect *c, Stream *r, int id);
 
 public:
 
@@ -407,7 +411,6 @@ void close_logs();
 void print_err(const char *format, ...);
 void print_err(Connect *c, const char *format, ...);
 void print_err(Stream *r, const char *format, ...);
-void print_log(Stream *r);
 //----------------------------------------------------------------------
 void ssl_shutdown(Connect *c);
 void close_connect(Connect *c);

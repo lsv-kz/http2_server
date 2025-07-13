@@ -60,9 +60,23 @@ void EventHandlerClass::del_from_list(Connect *r)
         work_list_start = work_list_end = NULL;
 }
 //----------------------------------------------------------------------
-void EventHandlerClass::close_stream(Connect *con, int id)
+void EventHandlerClass::close_stream(Connect *con, Stream *r, int id)
 {
-    con->h2.close_stream(&con->h2, id, &all_cgi);
+    if (r->cgi.start)
+    {
+        if (all_cgi <= 0)
+        {
+            print_err(con, "<%s:%d> Error: all_cgi=%d, id=%d \n", __func__, __LINE__, all_cgi, id);
+        }
+        else
+        {
+            all_cgi--;
+            if (conf->PrintDebugMsg)
+                print_err(con, "<%s:%d> all_cgi=%d, id=%d \n", __func__, __LINE__, all_cgi, id);
+        }
+    }
+
+    con->h2.close_stream(&con->h2, id);
 }
 //----------------------------------------------------------------------
 void EventHandlerClass::create_message(Stream *r, int status)

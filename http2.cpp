@@ -194,24 +194,28 @@ int EventHandlerClass::recv_frame_(Connect *con)
         }
 
         con->h2.header_len += ret;
+        if (con->h2.header_len == 9)
+        {
+            con->h2.body_len = ((unsigned char)con->h2.header[0]<<16) +
+                ((unsigned char)con->h2.header[1]<<8) + (unsigned char)con->h2.header[2];
+            con->h2.type = (FRAME_TYPE)con->h2.header[3];
+            con->h2.flags = con->h2.header[4];
+            con->h2.id = (((unsigned char)con->h2.header[5] & 0x7f)<<16) + ((unsigned char)con->h2.header[6]<<16) +
+                ((unsigned char)con->h2.header[7]<<8) + (unsigned char)con->h2.header[8];
+            if (conf->PrintDebugMsg)
+                hex_print_stderr(__func__, __LINE__, con->h2.header, 9);
+        }
     }
 
     if (con->h2.header_len == 9)
     {
-        if (conf->PrintDebugMsg)
-            hex_print_stderr(__func__, __LINE__, con->h2.header, 9);
-
-        con->h2.body_len = ((unsigned char)con->h2.header[0]<<16) +
-            ((unsigned char)con->h2.header[1]<<8) + (unsigned char)con->h2.header[2];
-        con->h2.type = (FRAME_TYPE)con->h2.header[3];
-        con->h2.flags = con->h2.header[4];
-        con->h2.id = (((unsigned char)con->h2.header[5] & 0x7f)<<16) + ((unsigned char)con->h2.header[6]<<16) +
-            ((unsigned char)con->h2.header[7]<<8) + (unsigned char)con->h2.header[8];
-
-        char buf[con->h2.body_len];
+        char buf[16384];
         if (con->h2.body_len > 0)
         {
-            int ret = read_from_client(con, buf, con->h2.body_len);
+            int len_rd = (int)sizeof(buf);
+            if (con->h2.body_len < len_rd)
+                len_rd = con->h2.body_len;
+            int ret = read_from_client(con, buf, len_rd);
             if (ret < 0)
             {
                 if (ret == ERR_TRY_AGAIN)
@@ -225,6 +229,8 @@ int EventHandlerClass::recv_frame_(Connect *con)
             con->h2.body_len -= ret;
             if (con->h2.body_len == 0)
                 con->h2.header_len = 0;
+            else if (con->h2.body_len > 0)
+                return 0;
         }
         else if (con->h2.body_len == 0)
         {
@@ -236,31 +242,36 @@ int EventHandlerClass::recv_frame_(Connect *con)
             con->sock_timer = 0;
             if (conf->PrintDebugMsg)
                 hex_print_stderr("recv SETTINGS", __LINE__, con->h2.body.ptr(), con->h2.body.size());
-
-            for (int i = 0; i < (con->h2.body.size()/6); ++i)
+            if (con->h2.body.size())
             {
-                int ind = i * 6;
-                if (buf[ind + 1] == 4)
+                for (int i = 0; i < (con->h2.body.size()/6); ++i)
                 {
-                    con->h2.init_window_size = (unsigned char)buf[ind + 5];
-                    con->h2.init_window_size += ((unsigned char)buf[ind + 4]<<8);
-                    con->h2.init_window_size += ((unsigned char)buf[ind + 3]<<16);
-                    con->h2.init_window_size += ((unsigned char)buf[ind + 2]<<24);
-                    con->h2.connect_window_size = con->h2.init_window_size;
-                    if (conf->PrintDebugMsg)
-                        print_err(con, "<%s:%d> SETTINGS_INITIAL_WINDOW_SIZE [%ld] id=%d \n", __func__, __LINE__, con->h2.connect_window_size, 0);
+                    int ind = i * 6;
+                    if (con->h2.body.get_byte(ind + 1) == 4)
+                    {
+                        con->h2.init_window_size = (unsigned char)con->h2.body.get_byte(ind + 5);
+                        con->h2.init_window_size += ((unsigned char)con->h2.body.get_byte(ind + 4)<<8);
+                        con->h2.init_window_size += ((unsigned char)con->h2.body.get_byte(ind + 3)<<16);
+                        con->h2.init_window_size += ((unsigned char)con->h2.body.get_byte(ind + 2)<<24);
+                        if (conf->PrintDebugMsg)
+                            print_err(con, "<%s:%d> SETTINGS_INITIAL_WINDOW_SIZE [%ld] id=%d \n", __func__, __LINE__, con->h2.init_window_size, 0);
+                    }
+                    else if (con->h2.body.get_byte(ind + 1) == 5)
+                    {
+                        int n = (unsigned char)con->h2.body.get_byte(ind + 5);
+                        n += ((unsigned char)con->h2.body.get_byte(ind + 4)<<8);
+                        n += ((unsigned char)con->h2.body.get_byte(ind + 3)<<16);
+                        n += ((unsigned char)con->h2.body.get_byte(ind + 2)<<24);
+                        if (n < conf->DataBufSize)
+                        {
+                            setDataBufSize(n);
+                        }
+                        if (conf->PrintDebugMsg)
+                            print_err(con, "<%s:%d> SETTINGS_MAX_FRAME_SIZE [%ld] id=%d \n", __func__, __LINE__, n, 0);
+                    }
                 }
-                else if (buf[ind + 1] == 5)
-                {
-                    int n = (unsigned char)buf[ind + 5];
-                    n += ((unsigned char)buf[ind + 4]<<8);
-                    n += ((unsigned char)buf[ind + 3]<<16);
-                    n += ((unsigned char)buf[ind + 2]<<24);
-                    //if (conf->PrintDebugMsg)
-                        print_err(con, "<%s:%d> SETTINGS_MAX_FRAME_SIZE [%ld] id=%d \n", __func__, __LINE__, n, 0);
-                    if (n < conf->DataBufSize)
-                        setDataBufSize(n);
-                }
+
+                con->h2.connect_window_size += con->h2.init_window_size;
             }
 
             if (con->h2.header[4] == FLAG_ACK)
@@ -311,12 +322,12 @@ int EventHandlerClass::recv_frame_(Connect *con)
             const char *p_buf = NULL;
             if (con->h2.header[4] & FLAG_PADDED)
             {
-                unsigned int padd = (unsigned char)buf[0];
+                unsigned int padd = (unsigned char)con->h2.body.get_byte(0);
                 body_len -= padd;
-                p_buf = buf + 1;
+                p_buf = con->h2.body.ptr() + 1;
             }
             else
-                p_buf = buf;
+                p_buf = con->h2.body.ptr();
             if (conf->PrintDebugMsg)
             {
                 if (body_len < 100)
@@ -369,25 +380,28 @@ int EventHandlerClass::recv_frame_(Connect *con)
             if (resp == NULL)
             {
                 print_err(con, "<%s:%d> Error id=%d \n", __func__, __LINE__, con->h2.id);
-                close_stream(con, con->h2.id);
+                set_rst_stream(con, con->h2.id, REFUSED_STREAM);
                 return 0;
             }
 
             set_response(con, resp);
 
-            if (conf->PrintDebugMsg)
+            //if (conf->PrintDebugMsg)
                 print_err(resp, "\"%s\" new request headers.size=%d, id=%d \n", resp->decode_path.c_str(), resp->headers.size(), resp->id);
         }
         else if (con->h2.type == GOAWAY)
         {
             //if (conf->PrintDebugMsg)
-                print_err(con, "<%s:%d> GOAWAY [%u] id=%d \n", __func__, __LINE__, (unsigned int)buf[7], con->h2.id);
+            {
+                print_err(con, "<%s:%d> GOAWAY [%u] id=%d \n", __func__, __LINE__, (unsigned int)con->h2.body.get_byte(7), con->h2.id);
+                hex_print_stderr("recv GOAWAY", __LINE__, con->h2.body.ptr(), con->h2.body.size());
+            }
             return -1;
         }
         else if (con->h2.type == RST_STREAM)
         {
             con->sock_timer = 0;
-            print_err(con, "<%s:%d> RST_STREAM [%u] id=%d \n", __func__, __LINE__, (unsigned int)buf[3], con->h2.id);
+            print_err(con, "<%s:%d> RST_STREAM [%u] id=%d \n", __func__, __LINE__, (unsigned int)con->h2.body.get_byte(3), con->h2.id);
             Stream *str = con->h2.get(con->h2.id);
             if (str)
                 str->rst_stream = true;
@@ -396,10 +410,12 @@ int EventHandlerClass::recv_frame_(Connect *con)
         }
         else if (con->h2.type == PING)
         {
+            //if (conf->PrintDebugMsg)
+                hex_print_stderr("recv PING", __LINE__, con->h2.body.ptr(), con->h2.body.size());
             con->sock_timer = 0;
             print_err(con, "<%s:%d> recv PING id=%d \n", __func__, __LINE__, con->h2.id);
             con->h2.ping.cpy("\x0\x0\x8\x6\x1\x0\x0\x0\x0", 9);
-            con->h2.ping.cat(buf, 8);
+            con->h2.ping.cat(con->h2.body.ptr(), con->h2.body.size());
         }
         else if (con->h2.type == WINDOW_UPDATE)
         {
@@ -476,6 +492,13 @@ int EventHandlerClass::send_frames_(Connect *con)
     }
     else if (con->h2.type_op == WORK_STREAM)
     {
+        if (con->h2.ping.size())
+        {
+            int ret = send_frame_ping(con);
+            if (ret < 0)
+                return ret;
+        }
+
         if (con->h2.goaway.size())
         {
             return send_frame_goawey(con);
@@ -484,13 +507,6 @@ int EventHandlerClass::send_frames_(Connect *con)
         if (con->h2.start_frame)
         {
             return send_frame_rststream(con);
-        }
-
-        if (con->h2.ping.size())
-        {
-            int ret = send_frame_ping(con);
-            if (ret < 0)
-                return ret;
         }
 
         if (con->h2.cgi_window_update > 0)
@@ -635,8 +651,6 @@ int EventHandlerClass::send_frame_rststream(Connect *con)
         return 0;
     }
 
-    close_stream(con, rf->id);
-
     int ret = write_to_client(con, rf->frame.ptr(), rf->frame.size(), 0);
     if (ret < 0)
     {
@@ -691,8 +705,8 @@ int EventHandlerClass::send_frame_data(Connect *con, Stream *resp)
         if (resp->rst_stream)
         {
             //set_frame_data(resp, 0, FLAG_END_STREAM);
-            print_log(con->h2.get(resp->id));
-            close_stream(con, resp->id);
+            print_log(resp);
+            close_stream(con, resp, resp->id);
             return 0;
         }
         else
@@ -757,8 +771,8 @@ int EventHandlerClass::send_frame_data(Connect *con, Stream *resp)
 
         resp->data.init();
         resp->send_end_stream = true;
-        print_log(con->h2.get(resp->id));
-        close_stream(con, resp->id);
+        print_log(resp);
+        close_stream(con, resp, resp->id);
         return 0;
     }
     else

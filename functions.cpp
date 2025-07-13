@@ -566,6 +566,8 @@ void set_frame_goaway(Connect *con, int error)
 //======================================================================
 int set_rst_stream(Connect *c, int id, int error)
 {
+    c->h2.close_stream(&c->h2, id);
+
     FrameRedySend *rf = NULL;
     rf = new(std::nothrow) FrameRedySend;
     if (!rf)
