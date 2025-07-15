@@ -2,7 +2,6 @@
 
 using namespace std;
 //======================================================================
-int create_multipart_head(Connect *req);
 void cgi_worker(Connect *con, Stream *resp, struct pollfd*);
 
 static EventHandlerClass event_handler_cl;
@@ -463,6 +462,12 @@ int EventHandlerClass::set_poll()
 
                 if ((c->h2.type_op == RECV_SETTINGS) || (c->h2.type_op == WORK_STREAM))
                 {
+                    if (c->h2.goaway.size())
+                    {
+                        print_err(c, "<%s:%d> c->h2.goaway.size() > 0, %s\n", __func__, __LINE__, get_str_operation(c->h2.type_op));
+                        break;
+                    }
+
                     if ((ret = recv_frame(c)) < 0)
                         break;
                 }
@@ -488,6 +493,13 @@ int EventHandlerClass::set_poll()
                 poll_fd[num_wait].events = POLLOUT;
             else // h2.type_op = WORK_STREAM
             {
+                if ((c->h2.goaway.size()) || c->h2.ping.size() || c->h2.start_frame)
+                {
+                    poll_fd[num_wait].events = POLLOUT;
+                    conn_array[num_wait++] = c;
+                    continue;
+                }
+
                 poll_fd[num_wait].events = POLLIN;
                 if (c->h2.connect_window_size <= 0)
                 {
@@ -497,7 +509,7 @@ int EventHandlerClass::set_poll()
                     continue;
                 }
 
-                if (c->h2.frame_win_update.size() || c->h2.goaway.size() || c->h2.ping.size() || c->h2.start_frame)
+                if (c->h2.frame_win_update.size())
                 {
                     poll_fd[num_wait].events |= POLLOUT;
                     conn_array[num_wait++] = c;

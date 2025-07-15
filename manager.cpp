@@ -14,15 +14,6 @@ mtx_conn.lock();
 mtx_conn.unlock();
 }
 //======================================================================
-void wait_close_all_conn()
-{
-unique_lock<mutex> lk(mtx_conn);
-    while (num_conn > 0)
-    {
-        cond_close_conn.wait(lk);
-    }
-}
-//======================================================================
 int is_maxconn()
 {
 unique_lock<mutex> lk(mtx_conn);
@@ -79,7 +70,7 @@ void EventHandlerClass::ssl_shutdown(Connect *conn)
                 {
                     conn->tls.err = SSL_get_error(conn->tls.ssl, ret);
                     //if (conf->PrintDebugMsg)
-                        print_err(conn, "<%s:%d> Error SSL_accept()=%d: %s\n", __func__, __LINE__, ret, ssl_strerror(conn->tls.err));
+                        print_err(conn, "<%s:%d> Error SSL_shutdown()=%d: %s\n", __func__, __LINE__, ret, ssl_strerror(conn->tls.err));
                     if (conn->tls.err == SSL_ERROR_ZERO_RETURN)
                     {
                         close_connect(conn);
@@ -99,7 +90,8 @@ void EventHandlerClass::ssl_shutdown(Connect *conn)
                     }
                     else
                     {
-                        print_err(conn, "<%s:%d> Error: %s\n", __func__, __LINE__, ssl_strerror(conn->tls.err));
+                        //if (conf->PrintDebugMsg == false)
+                            //print_err(conn, "<%s:%d> Error: %s\n", __func__, __LINE__, ssl_strerror(conn->tls.err));
                         break;
                     }
                 }
@@ -282,14 +274,4 @@ Connect *create_req(void)
     if (!req)
         print_err("<%s:%d> Error malloc(): %s\n", __func__, __LINE__, strerror(errno));
     return req;
-}
-//======================================================================
-void server_stop()
-{
-    {
-    lock_guard<mutex> lk(mtx_conn);
-        close_server = 1;
-    }
-
-    cond_close_conn.notify_all();
 }

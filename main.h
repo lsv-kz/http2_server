@@ -373,6 +373,7 @@ int strcmp_case(const char *s1, const char *s2);
 const char *get_str_frame_type(FRAME_TYPE);
 const char *get_str_operation(OPERATION_HTTP2);
 const char *get_cgi_type(CGI_TYPE n);
+const char *get_str_error(int err);
 
 int clean_path(char *path, int len);
 const char *content_type(const char *s);
@@ -386,8 +387,8 @@ void add_header(Stream *r, int ind);
 void add_header(Stream *r, int ind, const char *val);
 void set_frame_window_update(Connect *c, int len);
 void set_frame_window_update(Stream *r, int len);
-void set_frame_goaway(Connect *c, int error);
-int set_rst_stream(Connect *c, int id, int error);
+void set_frame_goaway(Connect *c, HTTP2_ERRORS error);
+int set_rst_stream(Connect *c, int id, HTTP2_ERRORS error);
 int set_response(Connect *c, Stream *r);
 CONTENT_TYPE get_content_type(const char *path);
 int parse_range(const char *s, long long file_size, long long *offset, long long *content_length);

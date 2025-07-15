@@ -223,6 +223,53 @@ const char *get_cgi_type(CGI_TYPE n)
     return "?";
 }
 //======================================================================
+const char *get_str_error(int err)
+{
+    switch (err)
+    {
+        case NO_ERROR: // 0
+            return "NO_ERROR";
+        case PROTOCOL_ERROR: // 1
+            return "PROTOCOL_ERROR";
+        case INTERNAL_ERROR: // 2
+            return "INTERNAL_ERROR";
+        case FLOW_CONTROL_ERROR: // 3
+            return "FLOW_CONTROL_ERROR";
+        case SETTINGS_TIMEOUT: // 4
+            return "SETTINGS_TIMEOUT";
+        case STREAM_CLOSED: // 5
+            return "STREAM_CLOSED";
+        case FRAME_SIZE_ERROR: // 6
+            return "FRAME_SIZE_ERROR";
+        case REFUSED_STREAM: // 7
+            return "REFUSED_STREAM";
+        case CANCEL: // 8
+            return "CANCEL";
+        case COMPRESSION_ERROR: // 9
+            return "COMPRESSION_ERROR";
+        case CONNECT_ERROR: // 10 (0xA)
+            return "CONNECT_ERROR";
+        case ENHANCE_YOUR_CALM: // 11 (0xB)
+            return "ENHANCE_YOUR_CALM";
+        case INADEQUATE_SECURITY: // 12 (0xC)
+            return "INADEQUATE_SECURITY";
+        case HTTP_1_1_REQUIRED: // 13 (0xD)
+            return "HTTP_1_1_REQUIRED";
+    }
+
+    switch ((int)err)
+    {
+        case 14:
+            return "14 (0XE)";
+        case 15:
+            return "15 (0xF)";
+        case 16:
+            return "16 (0x10)";
+    }
+
+    return "?";
+}
+//======================================================================
 const char *content_type(const char *s)
 {
     const char *p = strrchr(s, '.');
@@ -551,7 +598,7 @@ void set_frame_window_update(Connect *con, int len)
     con->h2.send_ready |= FRAME_WINUPDATE_CONNECT_READY;
 }
 //======================================================================
-void set_frame_goaway(Connect *con, int error)
+void set_frame_goaway(Connect *con, HTTP2_ERRORS error)
 {
     char buf[] = "\x0\x0\x0\x0\x0\x0\x0\x0";
     con->h2.goaway.cpy("\x0\x0\x8\x7\x0\x0\x0\x0\x0", 9);
@@ -564,7 +611,7 @@ void set_frame_goaway(Connect *con, int error)
     con->h2.goaway.cat(buf, 8);
 }
 //======================================================================
-int set_rst_stream(Connect *c, int id, int error)
+int set_rst_stream(Connect *c, int id, HTTP2_ERRORS error)
 {
     c->h2.close_stream(&c->h2, id);
 

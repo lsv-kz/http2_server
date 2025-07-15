@@ -293,7 +293,7 @@ int EventHandlerClass::recv_frame_(Connect *con)
             Stream *resp = con->h2.get(con->h2.id);
             if (!resp)
             {
-                print_err(con, "<%s:%d> Error list.get(id=%d), h2.body.size()=%d, flag=%d \n", __func__, __LINE__,
+                print_err(con, "<%s:%d> recv DATA: Error list.get(id=%d), h2.body.size()=%d, flag=%d \n", __func__, __LINE__,
                                 con->h2.id, con->h2.body.size(), (int)con->h2.header[4]);
                 return 0;
             }
@@ -393,15 +393,22 @@ int EventHandlerClass::recv_frame_(Connect *con)
         {
             //if (conf->PrintDebugMsg)
             {
-                print_err(con, "<%s:%d> GOAWAY [%u] id=%d \n", __func__, __LINE__, (unsigned int)con->h2.body.get_byte(7), con->h2.id);
+                print_err(con, "<%s:%d> GOAWAY [%s] id=%d \n", __func__, __LINE__, get_str_error(con->h2.body.get_byte(7)), con->h2.id);
                 hex_print_stderr("recv GOAWAY", __LINE__, con->h2.body.ptr(), con->h2.body.size());
             }
+
             return -1;
         }
         else if (con->h2.type == RST_STREAM)
         {
             con->sock_timer = 0;
-            print_err(con, "<%s:%d> RST_STREAM [%u] id=%d \n", __func__, __LINE__, (unsigned int)con->h2.body.get_byte(3), con->h2.id);
+            print_err(con, "<%s:%d> RST_STREAM [%s] id=%d \n", __func__, __LINE__, get_str_error(con->h2.body.get_byte(3)), con->h2.id);
+            if (con->h2.id == 0)
+            {
+                set_frame_goaway(con, PROTOCOL_ERROR);
+                return 0;
+            }
+
             Stream *str = con->h2.get(con->h2.id);
             if (str)
                 str->rst_stream = true;
@@ -492,16 +499,16 @@ int EventHandlerClass::send_frames_(Connect *con)
     }
     else if (con->h2.type_op == WORK_STREAM)
     {
+        if (con->h2.goaway.size())
+        {
+            return send_frame_goawey(con);
+        }
+
         if (con->h2.ping.size())
         {
             int ret = send_frame_ping(con);
             if (ret < 0)
                 return ret;
-        }
-
-        if (con->h2.goaway.size())
-        {
-            return send_frame_goawey(con);
         }
 
         if (con->h2.start_frame)
@@ -580,13 +587,13 @@ int EventHandlerClass::send_frames_(Connect *con)
 //======================================================================
 int EventHandlerClass::send_frame_settings(Connect *con)
 {
-    if (con->h2.settings.size_remain() == 0)
+    if (con->h2.settings.size() == 0)
     {
-        print_err(con, "<%s:%d> !!! SEND_SETTINGS Error: settings.size_remain() == 0\n", __func__, __LINE__);
+        print_err(con, "<%s:%d> !!! SEND_SETTINGS Error: settings.size() = 0\n", __func__, __LINE__);
         return -1;
     }
 
-    int ret = write_to_client(con, con->h2.settings.ptr_remain(), con->h2.settings.size_remain(), 0);
+    int ret = write_to_client(con, con->h2.settings.ptr(), con->h2.settings.size(), 0);
     if (ret < 0)
     {
         print_err(con, "<%s:%d> Error send frame SETTINGS\n", __func__, __LINE__);
@@ -704,7 +711,6 @@ int EventHandlerClass::send_frame_data(Connect *con, Stream *resp)
     {
         if (resp->rst_stream)
         {
-            //set_frame_data(resp, 0, FLAG_END_STREAM);
             print_log(resp);
             close_stream(con, resp, resp->id);
             return 0;
