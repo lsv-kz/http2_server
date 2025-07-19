@@ -108,7 +108,7 @@ int http2::close_stream(http2 *h2, int id)
                 }
             }
 
-            //if (conf->PrintDebugMsg)
+            if (conf->PrintDebugMsg)
                 print_err("<%s:%d>~~~~~~~ Close Stream, id=%d \n", __func__, __LINE__, r->id);
 
             del_from_list(r);

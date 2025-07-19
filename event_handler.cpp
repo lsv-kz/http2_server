@@ -133,15 +133,12 @@ mtx_thr.lock();
 mtx_thr.unlock();
 }
 //======================================================================
-int EventHandlerClass::cgi_set_poll()
+int EventHandlerClass::cgi_poll()
 {
     int cgi_ind_array = 0;
     num_cgi_poll = 0;
     time_t t = time(NULL);
     Connect *c = work_list_start, *next = NULL;
-    if (c == NULL)
-        return 0;
-
     for ( ; c; c = next)
     {
         next = c->next;
@@ -414,7 +411,7 @@ int EventHandlerClass::cgi_set_poll()
     return 0;
 }
 //======================================================================
-int EventHandlerClass::set_poll()
+void EventHandlerClass::http2_set_poll()
 {
     num_wait = 0;
     time_t t = time(NULL);
@@ -537,32 +534,23 @@ int EventHandlerClass::set_poll()
                 conn_array[num_wait++] = c;
         }
     }
-
-    return 0;
 }
-//----------------------------------------------------------------------
-int EventHandlerClass::poll_worker()
+//======================================================================
+int EventHandlerClass::http2_poll()
 {
-    int ret_poll = 0;
-    if (num_wait > 0)
+    if (num_wait == 0)
+        return 0;
+    int time_poll = conf->TimeoutPoll;
+    if (all_cgi > 0)
+        time_poll = 0;
+    int ret_poll = poll(poll_fd, num_wait, time_poll);
+    if (ret_poll == -1)
     {
-        int time_poll = conf->TimeoutPoll;
-        if (all_cgi > 0)
-            time_poll = 0;
-        ret_poll = poll(poll_fd, num_wait, time_poll);
-        if (ret_poll == -1)
-        {
-            print_err("<%s:%d> Error poll(): %s\n", __func__, __LINE__, strerror(errno));
-            return -1;
-        }
-        else if (ret_poll == 0)
-        {
-            return 0;
-        }
+        print_err("<%s:%d> Error poll(): %s\n", __func__, __LINE__, strerror(errno));
+        return -1;
     }
-    else
+    else if (ret_poll == 0)
     {
-        //print_err("<%s:%d> Error num_wait()=0\n", __func__, __LINE__);
         return 0;
     }
 
@@ -671,9 +659,10 @@ printf(" +++++ worker thread %d run +++++\n", n_thr);
         if (event_handler_cl.wait_connection())
             break;
         event_handler_cl.add_work_list();
-        event_handler_cl.cgi_set_poll();
-        event_handler_cl.set_poll();
-        if (event_handler_cl.poll_worker() < 0)
+        if (event_handler_cl.cgi_poll() < 0)
+            break;
+        event_handler_cl.http2_set_poll();
+        if (event_handler_cl.http2_poll() < 0)
             break;
     }
 

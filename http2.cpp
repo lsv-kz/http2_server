@@ -18,7 +18,8 @@ int EventHandlerClass::http2_connection(Connect *con)
                 ssl_shutdown(con);
                 return -1;
             }
-            //if (conf->PrintDebugMsg)
+
+            if (conf->PrintDebugMsg)
                 hex_print_stderr(__func__, __LINE__, buf, 24);
             con->sock_timer = 0;
             con->h2.type_op = SEND_SETTINGS;
@@ -45,7 +46,7 @@ int EventHandlerClass::http2_connection(Connect *con)
         if (ret < 1)
         {
             con->tls.err = SSL_get_error(con->tls.ssl, ret);
-            //if (conf->PrintDebugMsg)
+            if (conf->PrintDebugMsg)
                 print_err(con, "<%s:%d> Error SSL_accept()=%d: %s\n", __func__, __LINE__, ret, ssl_strerror(con->tls.err));
             if (con->tls.err == SSL_ERROR_WANT_READ)
             {
@@ -57,7 +58,8 @@ int EventHandlerClass::http2_connection(Connect *con)
             }
             else
             {
-                print_err(con, "<%s:%d> Error SSL_accept(): %s\n", __func__, __LINE__, ssl_strerror(con->tls.err));
+                if (conf->PrintDebugMsg == false)
+                    print_err(con, "<%s:%d> Error SSL_accept(): %s\n", __func__, __LINE__, ssl_strerror(con->tls.err));
                 close_connect(con);
                 return -1;
             }
@@ -277,7 +279,7 @@ int EventHandlerClass::recv_frame_(Connect *con)
             if (con->h2.header[4] == FLAG_ACK)
             {
                 if (conf->PrintDebugMsg)
-                    print_err(con, "<%s:%d> recv SETTINGS flag=ACK\n", __func__, __LINE__);
+                    print_err(con, "recv SETTINGS flag=ACK\n");
                 con->h2.ack_recv = true;
                 con->h2.type_op = WORK_STREAM;
             }
@@ -315,7 +317,7 @@ int EventHandlerClass::recv_frame_(Connect *con)
             {
                 resp->cgi.end_post_data = true;
                 if (conf->PrintDebugMsg)
-                    print_err(resp, "<%s:%d>  DATA FLAG_END_STREAM %d, con.cgi_window_size=%ld, stream.cgi_windows_size=%ld, id=%d \n", __func__, __LINE__, con->h2.body.size(), con->h2.cgi_window_size, resp->cgi.windows_size, resp->id);
+                    print_err(resp, "recv DATA END_STREAM %d, con.cgi_window_size=%ld, stream.cgi_windows_size=%ld, id=%d \n", con->h2.body.size(), con->h2.cgi_window_size, resp->cgi.windows_size, resp->id);
             }
 
             int body_len = con->h2.body.size();
@@ -331,7 +333,7 @@ int EventHandlerClass::recv_frame_(Connect *con)
             if (conf->PrintDebugMsg)
             {
                 if (body_len < 100)
-                    print_err(resp, "<%s:%d> +++ DATA %d, con.cgi_window_size=%ld, stream.cgi_windows_size=%ld, id=%d \n", __func__, __LINE__, body_len, con->h2.cgi_window_size, resp->cgi.windows_size, resp->id);
+                    print_err(resp, "<%s:%d> recv DATA %d, con.cgi_window_size=%ld, stream.cgi_windows_size=%ld, id=%d \n", __func__, __LINE__, body_len, con->h2.cgi_window_size, resp->cgi.windows_size, resp->id);
             }
 
             con->h2.cgi_window_size -= body_len;
@@ -392,17 +394,17 @@ int EventHandlerClass::recv_frame_(Connect *con)
         else if (con->h2.type == GOAWAY)
         {
             //if (conf->PrintDebugMsg)
-            {
-                print_err(con, "<%s:%d> GOAWAY [%s] id=%d \n", __func__, __LINE__, get_str_error(con->h2.body.get_byte(7)), con->h2.id);
+                print_err(con, "GOAWAY [%s]\n", get_str_error(con->h2.body.get_byte(7)));
+
+            if (con->h2.body.get_byte(7))
                 hex_print_stderr("recv GOAWAY", __LINE__, con->h2.body.ptr(), con->h2.body.size());
-            }
 
             return -1;
         }
         else if (con->h2.type == RST_STREAM)
         {
             con->sock_timer = 0;
-            print_err(con, "<%s:%d> RST_STREAM [%s] id=%d \n", __func__, __LINE__, get_str_error(con->h2.body.get_byte(3)), con->h2.id);
+            print_err(con, "recv RST_STREAM [%s] id=%d \n", get_str_error(con->h2.body.get_byte(3)), con->h2.id);
             if (con->h2.id == 0)
             {
                 set_frame_goaway(con, PROTOCOL_ERROR);
@@ -411,16 +413,24 @@ int EventHandlerClass::recv_frame_(Connect *con)
 
             Stream *str = con->h2.get(con->h2.id);
             if (str)
-                str->rst_stream = true;
+            {
+                if (str->data.size() == 0)
+                {
+                    print_log(str);
+                    close_stream(con, str, str->id);
+                }
+                else
+                    str->rst_stream = true;
+            }
             else
                 print_err(con, "<%s:%d> RST_STREAM Error stream id=%d does not exist\n", __func__, __LINE__, con->h2.id);
         }
         else if (con->h2.type == PING)
         {
-            //if (conf->PrintDebugMsg)
+            if (conf->PrintDebugMsg)
                 hex_print_stderr("recv PING", __LINE__, con->h2.body.ptr(), con->h2.body.size());
             con->sock_timer = 0;
-            print_err(con, "<%s:%d> recv PING id=%d \n", __func__, __LINE__, con->h2.id);
+            print_err(con, "recv PING\n");
             con->h2.ping.cpy("\x0\x0\x8\x6\x1\x0\x0\x0\x0", 9);
             con->h2.ping.cat(con->h2.body.ptr(), con->h2.body.size());
         }
@@ -569,7 +579,7 @@ int EventHandlerClass::send_frames_(Connect *con)
             int ret = send_frame_headers(con, resp);
             if (ret < 0)
                 return ret;
-            //return 0;
+            return 0;
         }
 
         int ret = send_frame_data(con, resp);
@@ -626,7 +636,7 @@ int EventHandlerClass::send_frame_ping(Connect *con)
         return ret;
     }
 
-    //if (conf->PrintDebugMsg)
+    if (conf->PrintDebugMsg)
         hex_print_stderr(__func__, __LINE__, con->h2.ping.ptr(), con->h2.ping.size());
     con->h2.ping.init();
 
@@ -709,32 +719,23 @@ int EventHandlerClass::send_frame_data(Connect *con, Stream *resp)
 
     if (resp->data.size() == 0)
     {
-        if (resp->rst_stream)
+        if (con->h2.connect_window_size <= 0)
         {
-            print_log(resp);
-            close_stream(con, resp, resp->id);
+            //print_err(resp, "<%s:%d> !!! connect_window_size(%ld) <= 0, id=%d \n", __func__, __LINE__, con->h2.connect_window_size, resp->id);
             return 0;
         }
-        else
+
+        if (resp->stream_window_size <= 0)
         {
-            if (con->h2.connect_window_size <= 0)
-            {
-                //print_err(resp, "<%s:%d> !!! connect_window_size(%ld) <= 0, id=%d \n", __func__, __LINE__, con->h2.connect_window_size, resp->id);
-                return 0;
-            }
-
-            if (resp->stream_window_size <= 0)
-            {
-                //print_err(resp, "<%s:%d> !!! stream_window_size(%ld) <= 0, %ld, id=%d \n", __func__, __LINE__, resp->stream_window_size, con->h2.connect_window_size, resp->id);
-                return 0;
-            }
-
-            int ret = set_frame_data(con, resp);
-            if (ret < 0)
-                return ret;
-            else if (ret == 0)
-                return 0;
+            //print_err(resp, "<%s:%d> !!! stream_window_size(%ld) <= 0, %ld, id=%d \n", __func__, __LINE__, resp->stream_window_size, con->h2.connect_window_size, resp->id);
+            return 0;
         }
+
+        int ret = set_frame_data(con, resp);
+        if (ret < 0)
+            return ret;
+        else if (ret == 0)
+            return 0;
     }
 
     int ret = write_to_client(con, resp->data.ptr(), resp->data.size(), resp->id);
@@ -767,15 +768,14 @@ int EventHandlerClass::send_frame_data(Connect *con, Stream *resp)
                                                 ret, resp->send_bytes, resp->id);
     }
 
-    if (resp->data.get_byte(4) == FLAG_END_STREAM)
+    if ((resp->data.get_byte(4) & FLAG_END_STREAM) || resp->rst_stream)
     {
         if (conf->PrintDebugMsg)
         {
-            print_err(resp, "<%s:%d>... send frame DATA, END_STREAM, end request send %lld bytes, data.size=%d ... id=%d \n", 
-                        __func__, __LINE__, resp->send_bytes, resp->data.size(), resp->id);
+            print_err(resp, "<%s:%d>... send frame DATA, END_STREAM, [%s] send %lld bytes, data.size=%d ... id=%d \n", 
+                        __func__, __LINE__, resp->decode_path.c_str(), resp->send_bytes, resp->data.size(), resp->id);
         }
 
-        resp->data.init();
         resp->send_end_stream = true;
         print_log(resp);
         close_stream(con, resp, resp->id);

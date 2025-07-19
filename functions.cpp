@@ -707,58 +707,51 @@ int set_frame_data(Connect *con, Stream *resp)
         if (resp->content == REGFILE)
         {
             if (resp->send_cont_length > conf->DataBufSize)
-            {
                 data_len = conf->DataBufSize;
-            }
             else
-            {
                 data_len = (int)resp->send_cont_length;
-            }
 
-            if (data_len > min_window_size)
+            char buf[conf->DataBufSize];
+            if (data_len > 0)
             {
-                //print_err(con, "<%s:%d> !!! data_len(%ld) > min_window_size(%ld), id=%d \n", __func__, __LINE__, data_len, min_window_size, resp->id);
-                data_len = min_window_size;
+                if (data_len > min_window_size)
+                {
+                    //print_err(con, "<%s:%d> !!! data_len(%ld) > min_window_size(%ld), id=%d \n", __func__, __LINE__, data_len, min_window_size, resp->id);
+                    data_len = min_window_size;
+                }
+
+                int ret = read(resp->fd, buf, data_len);
+                if (ret <= 0)
+                {
+                    print_err(con, "<%s:%d> Error read(fd=%d)=%d: %s, id=%d \n", __func__, __LINE__, resp->fd, ret, strerror(errno), resp->id);
+                    close(resp->fd);
+                    resp->fd = -1;
+                    return -1;
+                }
+
+                data_len = ret;
             }
 
             resp->send_cont_length -= data_len;
-
-            char buf[conf->DataBufSize];
-            int n = read(resp->fd, buf, data_len);
-            if (n <= 0)
-            {
-                print_err(con, "<%s:%d> Error read(fd=%d)=%d: %s, id=%d \n", __func__, __LINE__, resp->fd, n, strerror(errno), resp->id);
-                close(resp->fd);
-                resp->fd = -1;
-                return -1;
-            }
-
-            int flag = 0;
+            int flag = (resp->send_cont_length > 0) ? 0 : FLAG_END_STREAM;
+            set_frame_data(resp, data_len, flag);
+            if (data_len > 0)
+                resp->data.cat(buf, data_len);
             if (resp->send_cont_length == 0)
             {
                 close(resp->fd);
                 resp->fd = -1;
-                flag = FLAG_END_STREAM;
             }
-
-            set_frame_data(resp, data_len, flag);
-            resp->data.cat(buf, data_len);
         }
         else if (resp->content == DIRECTORY)
         {
             if (resp->send_cont_length > conf->DataBufSize)
-            {
                 data_len = conf->DataBufSize;
-            }
             else
-            {
                 data_len = (int)resp->send_cont_length;
-            }
 
             if (data_len > min_window_size)
                 data_len = min_window_size;
-
-            resp->send_cont_length -= data_len;
 
             if ((resp->html.get_offset() + data_len) > resp->html.size())
             {
@@ -766,6 +759,7 @@ int set_frame_data(Connect *con, Stream *resp)
                 return -1;
             }
 
+            resp->send_cont_length -= data_len;
             int flag = (resp->send_cont_length > 0) ? 0 : FLAG_END_STREAM;
             set_frame_data(resp, data_len, flag);
             resp->data.cat(resp->html.ptr_remain(), data_len);

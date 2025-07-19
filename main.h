@@ -200,13 +200,14 @@ struct http2
 
     ~http2()
     {
-        print_err("[%lu] <%s:%d> ~~~~ close connect\n", numConn, __func__, __LINE__);
+        if (conf->PrintDebugMsg)
+            print_err("[%lu] <%s:%d> ~~~~ Close Connect\n", numConn, __func__, __LINE__);
         Stream *r = start_stream, *next = NULL;
         for ( ; r; r = next)
         {
             next = r->next;
             print_log(r);
-            //if (conf->PrintDebugMsg)
+            if (conf->PrintDebugMsg)
                 print_err("<%s:%d>~~~~~~~ Close Stream, id=%d \n", __func__, __LINE__, r->id);
             delete r;
         }
@@ -322,9 +323,11 @@ public:
     void close_connect(Connect *r);
     void ssl_shutdown(Connect *r);
 
-    int cgi_set_poll();
-    int set_poll();
-    int poll_worker();
+    int cgi_poll();
+
+    void http2_set_poll();
+    int http2_poll();
+
     void push_wait_list(Connect *c);
     void close_event_handler();
 };

@@ -64,12 +64,12 @@ void EventHandlerClass::ssl_shutdown(Connect *conn)
             for ( int i = 0; i < 2; ++i)
             {
                 int ret = SSL_shutdown(conn->tls.ssl);
-                //if (conf->PrintDebugMsg)
+                if (conf->PrintDebugMsg)
                     print_err(conn, "<%s:%d> SSL_shutdown()=%d\n", __func__, __LINE__, ret);
                 if (ret == -1)
                 {
                     conn->tls.err = SSL_get_error(conn->tls.ssl, ret);
-                    //if (conf->PrintDebugMsg)
+                    if (conf->PrintDebugMsg)
                         print_err(conn, "<%s:%d> Error SSL_shutdown()=%d: %s\n", __func__, __LINE__, ret, ssl_strerror(conn->tls.err));
                     if (conn->tls.err == SSL_ERROR_ZERO_RETURN)
                     {
