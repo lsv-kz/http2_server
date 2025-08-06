@@ -45,15 +45,15 @@ static int alpn_select_proto_cb(SSL *ssl, const unsigned char **out, unsigned ch
 //======================================================================
 int configure_context(SSL_CTX *ctx)
 {
-    if (SSL_CTX_use_certificate_file(ctx, "cert/cert.pem", SSL_FILETYPE_PEM) != 1)
+    if (SSL_CTX_use_certificate_file(ctx, conf->Certificate.c_str(), SSL_FILETYPE_PEM) != 1)
     {
-        fprintf(stderr, "<%s:%d> SSL_CTX_use_certificate_file failed\n", __func__, __LINE__);
+        fprintf(stderr, "<%s:%d> SSL_CTX_use_certificate_file failed: %s\n", __func__, __LINE__, conf->Certificate.c_str());
         return -1;
     }
 
-    if (SSL_CTX_use_PrivateKey_file(ctx, "cert/key.pem", SSL_FILETYPE_PEM) != 1)
+    if (SSL_CTX_use_PrivateKey_file(ctx, conf->CertificateKey.c_str(), SSL_FILETYPE_PEM) != 1)
     {
-        fprintf(stderr, "<%s:%d> SSL_CTX_use_PrivateKey_file failed\n", __func__, __LINE__);
+        fprintf(stderr, "<%s:%d> SSL_CTX_use_PrivateKey_file failed: %s\n", __func__, __LINE__, conf->CertificateKey.c_str());
         return -1;
     }
 

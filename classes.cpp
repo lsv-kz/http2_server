@@ -294,9 +294,13 @@ int http2::get_header(int ind, std::string& name, std::string& val, int *len)
         if (ind > 61)
         {
             Header *hd = dyn_tab.get(ind);
-            if (!hd)
-                return -1;
-            name = hd->name;
+            if (hd)
+                name = hd->name;
+            else
+            {
+                name = "?";
+                //return -1;
+            }
         }
         else
             name = static_tab[ind][0];
@@ -332,10 +336,17 @@ int http2::parse(Stream *r)
             if (ind > 61)
             {
                 Header *hd = dyn_tab.get(ind);
-                if (!hd)
-                    return -1;
-                name = hd->name;
-                val = hd->val;
+                if (hd)
+                {
+                    name = hd->name;
+                    val = hd->val;
+                }
+                else
+                {
+                    name = "?";
+                    val = "?";
+                    //return -1;
+                }
             }
             else
             {

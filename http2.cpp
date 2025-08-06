@@ -348,6 +348,8 @@ int EventHandlerClass::recv_frame_(Connect *con)
         }
         else if (con->h2.type == HEADERS)
         {
+            if (conf->PrintDebugMsg)
+                hex_print_stderr(__func__, __LINE__, con->h2.body.ptr(), con->h2.body.size());
             con->sock_timer = 0;
             con->h2.numReq++;
             Stream *resp = con->h2.add();

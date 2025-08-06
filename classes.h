@@ -65,6 +65,8 @@ public:
     std::string ServerAddr;
     std::string ServerPort;
 
+    std::string Certificate;
+    std::string CertificateKey;
     std::string DocumentRoot;
     std::string ScriptPath;
     std::string LogPath;

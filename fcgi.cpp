@@ -520,6 +520,7 @@ void EventHandlerClass::fcgi_get_headers(Connect* con, Stream *resp)
             {
                 set_frame_headers(resp);
                 add_header(resp, 8, "204");
+                add_header(resp, 54, conf->ServerSoftware.c_str());
                 add_header(resp, 33, get_time().c_str());
                 add_header(resp, 28, "0");
                 resp->create_headers = true;
@@ -549,6 +550,7 @@ void EventHandlerClass::fcgi_get_headers(Connect* con, Stream *resp)
                 print_err(resp, "<%s:%d> Content-Type: %s, id=%d \n", __func__, __LINE__, cont_type, resp->id);
             set_frame_headers(resp);
             add_header(resp, 8, status_resp(resp->status));
+            add_header(resp, 54, conf->ServerSoftware.c_str());
             add_header(resp, 33, get_time().c_str());
             add_header(resp, 31, cont_type);
             resp->create_headers = true;

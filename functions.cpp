@@ -575,16 +575,12 @@ void set_frame_headers(Stream *resp)
 {
     int id = resp->id;
     resp->headers.cpy("\0\0\0\1\4\0\0\0\0", 9);
-
-    int len = resp->headers.size() - 9;
-    resp->headers.set_byte((len>>16) & 0xff, 0);
-    resp->headers.set_byte((len>>8) & 0xff, 1);
-    resp->headers.set_byte(len & 0xff, 2);
-
     resp->headers.set_byte((id>>24) & 0x7f, 5);
     resp->headers.set_byte((id>>16) & 0xff, 6);
     resp->headers.set_byte((id>>8) & 0xff, 7);
     resp->headers.set_byte(id & 0xff, 8);
+    if (resp->numReq == 1)
+        resp->headers.cat(0x20);
 }
 //======================================================================
 void add_header(Stream *resp, int ind)
@@ -919,6 +915,7 @@ int set_response(Connect *con, Stream *resp)
             add_header(resp, 10);
         else
             add_header(resp, 8);
+        add_header(resp, 54, conf->ServerSoftware.c_str());
         add_header(resp, 33, get_time().c_str());
         const char  *cont_type = content_type(resp->path.c_str());
         if (cont_type)
@@ -968,6 +965,7 @@ int set_response(Connect *con, Stream *resp)
         {
             set_frame_headers(resp);
             add_header(resp, 8, "301");
+            add_header(resp, 54, conf->ServerSoftware.c_str());
             add_header(resp, 33, get_time().c_str());
             add_header(resp, 46, resp->path.append("/").c_str());
             add_header(resp, 31, "text/plain");
@@ -996,6 +994,7 @@ int set_response(Connect *con, Stream *resp)
         //------------- headers frame --------------
         set_frame_headers(resp);
         add_header(resp, 8);
+        add_header(resp, 54, conf->ServerSoftware.c_str());
         add_header(resp, 33, get_time().c_str());
         add_header(resp, 31, "text/html");
         resp->create_headers = true;
@@ -1083,6 +1082,7 @@ void resp_200(Stream *resp)
     {
         set_frame_headers(resp);
         add_header(resp, 8);
+        add_header(resp, 54, conf->ServerSoftware.c_str());
         add_header(resp, 33, get_time().c_str());
         add_header(resp, 31, "text/plain");
         resp->create_headers = true;
@@ -1099,6 +1099,7 @@ void resp_204(Stream *resp)
     resp->content = ERROR_TYPE;
     set_frame_headers(resp);
     add_header(resp, 8, "204");
+    add_header(resp, 54, conf->ServerSoftware.c_str());
     add_header(resp, 33, get_time().c_str());
     add_header(resp, 28, "0");
     resp->create_headers = true;
@@ -1112,6 +1113,7 @@ void resp_400(Stream *resp)
     {
         set_frame_headers(resp);
         add_header(resp, 12);
+        add_header(resp, 54, conf->ServerSoftware.c_str());
         add_header(resp, 33, get_time().c_str());
         add_header(resp, 31, "text/plain");
         resp->create_headers = true;
@@ -1130,6 +1132,7 @@ void resp_403(Stream *resp)
     {
         set_frame_headers(resp);
         add_header(resp, 8, "403");
+        add_header(resp, 54, conf->ServerSoftware.c_str());
         add_header(resp, 33, get_time().c_str());
         add_header(resp, 31, "text/plain");
         resp->create_headers = true;
@@ -1148,6 +1151,7 @@ void resp_404(Stream *resp)
     {
         set_frame_headers(resp);
         add_header(resp, 13);
+        add_header(resp, 54, conf->ServerSoftware.c_str());
         add_header(resp, 33, get_time().c_str());
         add_header(resp, 31, "text/plain");
         resp->create_headers = true;
@@ -1166,6 +1170,7 @@ void resp_408(Stream *resp)
     {
         set_frame_headers(resp);
         add_header(resp, 8, "408");
+        add_header(resp, 54, conf->ServerSoftware.c_str());
         add_header(resp, 33, get_time().c_str());
         add_header(resp, 31, "text/plain");
         resp->create_headers = true;
@@ -1184,6 +1189,7 @@ void resp_411(Stream *resp)
     {
         set_frame_headers(resp);
         add_header(resp, 8, "411");
+        add_header(resp, 54, conf->ServerSoftware.c_str());
         add_header(resp, 33, get_time().c_str());
         add_header(resp, 31, "text/plain");
         resp->create_headers = true;
@@ -1202,6 +1208,7 @@ void resp_413(Stream *resp)
     {
         set_frame_headers(resp);
         add_header(resp, 8, "413");
+        add_header(resp, 54, conf->ServerSoftware.c_str());
         add_header(resp, 33, get_time().c_str());
         add_header(resp, 31, "text/plain");
         resp->create_headers = true;
@@ -1220,6 +1227,7 @@ void resp_414(Stream *resp)
     {
         set_frame_headers(resp);
         add_header(resp, 8, "414");
+        add_header(resp, 54, conf->ServerSoftware.c_str());
         add_header(resp, 33, get_time().c_str());
         add_header(resp, 31, "text/plain");
         resp->create_headers = true;
@@ -1238,6 +1246,7 @@ void resp_431(Stream *resp)
     {
         set_frame_headers(resp);
         add_header(resp, 8, "431");
+        add_header(resp, 54, conf->ServerSoftware.c_str());
         add_header(resp, 33, get_time().c_str());
         add_header(resp, 31, "text/plain");
         resp->create_headers = true;
@@ -1256,6 +1265,7 @@ void resp_500(Stream *resp)
     {
         set_frame_headers(resp);
         add_header(resp, 14);
+        add_header(resp, 54, conf->ServerSoftware.c_str());
         add_header(resp, 33, get_time().c_str());
         add_header(resp, 31, "text/plain");
         resp->create_headers = true;
@@ -1274,6 +1284,7 @@ void resp_502(Stream *resp)
     {
         set_frame_headers(resp);
         add_header(resp, 8, "502");
+        add_header(resp, 54, conf->ServerSoftware.c_str());
         add_header(resp, 33, get_time().c_str());
         add_header(resp, 31, "text/plain");
         resp->create_headers = true;
@@ -1292,6 +1303,7 @@ void resp_504(Stream *resp)
     {
         set_frame_headers(resp);
         add_header(resp, 8, "504");
+        add_header(resp, 54, conf->ServerSoftware.c_str());
         add_header(resp, 33, get_time().c_str());
         add_header(resp, 31, "text/plain");
         resp->create_headers = true;

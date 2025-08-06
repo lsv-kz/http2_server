@@ -52,6 +52,8 @@ void create_conf_file(const char *path)
     fprintf(f, "ServerAddr           0.0.0.0\n");
     fprintf(f, "ServerPort           ?\n\n");
 
+    fprintf(f, "Certificate          ?\n");
+    fprintf(f, "CertificateKey       ?\n");
     fprintf(f, "DocumentRoot         ?\n");
     fprintf(f, "ScriptPath           ?\n");
     fprintf(f, "LogPath              ?\n");
@@ -307,6 +309,10 @@ int read_conf_file(FILE *fconf)
                 s2 >> c.MaxAcceptConnections;
             else if ((s1 == "TimeoutPoll") && is_number(s2.c_str()))
                 s2 >> c.TimeoutPoll;
+            else if (s1 == "Certificate")
+                s2 >> c.Certificate;
+            else if (s1 == "CertificateKey")
+                s2 >> c.CertificateKey;
             else if (s1 == "DocumentRoot")
                 s2 >> c.DocumentRoot;
             else if (s1 == "ScriptPath")
