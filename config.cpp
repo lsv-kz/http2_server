@@ -304,6 +304,9 @@ int read_conf_file(FILE *fconf)
                     fprintf(stderr, "<%s:%d> Error read config file: DataBufSize > 16384, [%s], line <%d>\n", __func__, __LINE__, ss.c_str(), line_);
                     return -1;
                 }
+
+                if (c.DataBufSize > 16375)
+                    c.DataBufSize = 16375;
             }
             else if ((s1 == "MaxAcceptConnections") && is_number(s2.c_str()))
                 s2 >> c.MaxAcceptConnections;

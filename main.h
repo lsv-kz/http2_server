@@ -114,7 +114,7 @@ struct http2
     Stream *end_stream;
 
     Stream *work_stream;
-    
+
     FrameRedySend *start_list_send_frame;
     FrameRedySend *end_list_send_frame;
 

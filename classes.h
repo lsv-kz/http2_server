@@ -248,7 +248,7 @@ struct Stream
 
     ~Stream()
     {
-        //if (conf->PrintDebugMsg == 'y')
+        if (conf->PrintDebugMsg)
         {
             if ((send_bytes != file_size) && (content == REGFILE))
                 print_err("<%s:%d> !!! ~Resp(%s), send_bytes=%lld(%lld), stream_window_size=%ld, id=%d \n", 

@@ -610,6 +610,22 @@ void add_header(Stream *resp, int ind, const char *val)
     resp->headers.set_byte(len & 0xff, 2);
 }
 //======================================================================
+/*void add_header(Stream *resp, int ind, const char *val)
+{
+    if ((ind >= 8) && (ind <= 14))
+        resp->status = atoi(val);
+    int len = (int)strlen(val);
+    char s[8];
+    s[0] = (ind | 0x40);
+    s[1] = (char)len;
+    resp->headers.cat(s, 2);
+    resp->headers.cat(val, len);
+    len = resp->headers.size() - 9;
+    resp->headers.set_byte((len>>16) & 0xff, 0);
+    resp->headers.set_byte((len>>8) & 0xff, 1);
+    resp->headers.set_byte(len & 0xff, 2);
+}*/
+//======================================================================
 void set_frame_window_update(Stream *resp, int len)
 {
     int id = resp->id;
@@ -747,14 +763,14 @@ int set_frame_data(Connect *con, Stream *resp)
             {
                 if (data_len > min_window_size)
                 {
-                    //print_err(con, "<%s:%d> !!! data_len(%ld) > min_window_size(%ld), id=%d \n", __func__, __LINE__, data_len, min_window_size, resp->id);
+                    //print_err(resp, "<%s:%d> !!! data_len(%ld) > min_window_size(%ld), id=%d \n", __func__, __LINE__, data_len, min_window_size, resp->id);
                     data_len = min_window_size;
                 }
 
                 int ret = read(resp->fd, buf, data_len);
                 if (ret <= 0)
                 {
-                    print_err(con, "<%s:%d> Error read(fd=%d)=%d: %s, id=%d \n", __func__, __LINE__, resp->fd, ret, strerror(errno), resp->id);
+                    print_err(resp, "<%s:%d> Error read(fd=%d)=%d: %s, id=%d \n", __func__, __LINE__, resp->fd, ret, strerror(errno), resp->id);
                     close(resp->fd);
                     resp->fd = -1;
                     return -1;
@@ -786,7 +802,7 @@ int set_frame_data(Connect *con, Stream *resp)
 
             if ((resp->html.get_offset() + data_len) > resp->html.size())
             {
-                print_err(con, "<%s:%d> Error\n", __func__, __LINE__);
+                print_err(resp, "<%s:%d> Error\n", __func__, __LINE__);
                 return -1;
             }
 
@@ -825,7 +841,7 @@ int set_response(Connect *con, Stream *resp)
 
     if (len > (resp->size_uri - 1))
     {
-        print_err(con, "<%s:%d> Error: 414 URI Too Long [%d], id=%d \n", __func__, __LINE__, len, resp->id);
+        print_err(resp, "<%s:%d> Error: 414 URI Too Long [%d], id=%d \n", __func__, __LINE__, len, resp->id);
         resp_414(resp);
         return 0;
     }
@@ -843,21 +859,21 @@ int set_response(Connect *con, Stream *resp)
     {
         if (resp->content_type.size() == 0)
         {
-            print_err(con, "<%s:%d> Content-Type \?\n", __func__, __LINE__);
+            print_err(resp, "<%s:%d> Content-Type \?\n", __func__, __LINE__);
             resp_400(resp);
             return 0;
         }
 
         if (resp->content_length.size() == 0)
         {
-            print_err(con, "<%s:%d> 411 Length Required\n", __func__, __LINE__);
+            print_err(resp, "<%s:%d> 411 Length Required\n", __func__, __LINE__);
             resp_411(resp);
             return 0;
         }
 
         if (resp->post_cont_length >= conf->ClientMaxBodySize)
         {
-            print_err(con, "<%s:%d> 413 Request entity too large: %lld\n", __func__, __LINE__, resp->post_cont_length);
+            print_err(resp, "<%s:%d> 413 Request entity too large: %lld\n", __func__, __LINE__, resp->post_cont_length);
             resp_413(resp);
             return 0;
         }
@@ -893,7 +909,7 @@ int set_response(Connect *con, Stream *resp)
         resp->file_size = (long long)file_size(path.c_str());
         if (resp->file_size < 0)
         {
-            print_err(con, "<%s:%d> Error file_size(%s)\n", __func__, __LINE__, path.c_str());
+            print_err(resp, "<%s:%d> Error file_size(%s)\n", __func__, __LINE__, path.c_str());
             resp_500(resp);
             return 0;
         }
@@ -902,7 +918,7 @@ int set_response(Connect *con, Stream *resp)
         {
             if (parse_range(resp->range.c_str(), resp->file_size, &resp->offset, &resp->send_cont_length))
             {
-                print_err(con, "<%s:%d> Error parse_range(%s)\n", __func__, __LINE__, resp->range.c_str());
+                print_err(resp, "<%s:%d> Error parse_range(%s)\n", __func__, __LINE__, resp->range.c_str());
                 resp_400(resp);
                 return 0;
             }
@@ -946,7 +962,7 @@ int set_response(Connect *con, Stream *resp)
         resp->fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
         if (resp->fd == -1)
         {
-            print_err(con, "<%s:%d> Error open(%s): %s\n", __func__, __LINE__, resp->decode_path.c_str(), strerror(errno));
+            print_err(resp, "<%s:%d> Error open(%s): %s\n", __func__, __LINE__, resp->decode_path.c_str(), strerror(errno));
             if (errno == EACCES)
                 resp_403(resp);
             else if (errno == ENOENT)
@@ -987,7 +1003,7 @@ int set_response(Connect *con, Stream *resp)
         int err = index_dir(con, path, resp);
         if (err)
         {
-            print_err(con, "<%s:%d> Error index_dir(): %d\n", __func__, __LINE__, -err);
+            print_err(resp, "<%s:%d> Error index_dir(): %d\n", __func__, __LINE__, -err);
             resp_500(resp);
             return 0;
         }
@@ -1015,7 +1031,7 @@ int set_response(Connect *con, Stream *resp)
         }
         else
         {
-            print_err(con, "<%s:%d> Error: CONTENT_TYPE %s, create_headers=%d, send_headers=%d\n", __func__, __LINE__, path.c_str(), resp->create_headers, resp->send_headers);
+            print_err(resp, "<%s:%d> Error: CONTENT_TYPE %s, create_headers=%d, send_headers=%d\n", __func__, __LINE__, path.c_str(), resp->create_headers, resp->send_headers);
             resp_404(resp);
         }
     }

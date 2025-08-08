@@ -369,7 +369,7 @@ int EventHandlerClass::recv_frame_(Connect *con)
             else
             {
                 // frame CONTINUATION not support
-                print_err(con, "<%s:%d> Error: frame CONTINUATION not support, id=%d \n", __func__, __LINE__, con->h2.id);
+                print_err(resp, "<%s:%d> Error: frame CONTINUATION not support, id=%d \n", __func__, __LINE__, con->h2.id);
                 set_response(con, resp);
                 print_err(resp, "\"%s\" new request headers.size=%d, id=%d \n", resp->decode_path.c_str(), resp->headers.size(), con->h2.id);
                 resp_431(resp);
@@ -406,7 +406,7 @@ int EventHandlerClass::recv_frame_(Connect *con)
             Stream *resp = con->h2.get(con->h2.id);
             if (resp)
             {
-                //print_err(con, "<%s:%d> RST_STREAM  data.size=%d, id=%d\n", __func__, __LINE__, resp->data.size(), con->h2.id);
+                //print_err(resp, "<%s:%d> RST_STREAM  data.size=%d, id=%d\n", __func__, __LINE__, resp->data.size(), con->h2.id);
                 if (resp->data.size() == 0)
                 {
                     print_log(resp);
@@ -486,8 +486,6 @@ void EventHandlerClass::send_frames(Connect *con)
     }
 
     con->h2.try_again = false;
-    if (con->h2.work_stream)
-        con->h2.work_stream = con->h2.work_stream->next;
 }
 //======================================================================
 int EventHandlerClass::send_frames_(Connect *con)
@@ -536,7 +534,7 @@ int EventHandlerClass::send_frames_(Connect *con)
             if (ret < 0)
                 return ret;
         }
-
+        //--------------------------------------------------------------
         int n = con->h2.size();
         if (n > conf->MaxConcurrentStreams)
         {
@@ -558,31 +556,47 @@ int EventHandlerClass::send_frames_(Connect *con)
             }
         }
 
-        if (resp->frame_win_update.size() || (resp->cgi.window_update > 0))
+        for ( ; resp; )
         {
-            if (resp->cgi.window_update > 32000)
+            if (resp->frame_win_update.size() || (resp->cgi.window_update > 0))
             {
-                if (conf->PrintDebugMsg)
-                    print_err(resp, "<%s:%d> ??? resp->cgi.window_update(%ld) > 32000\n", __func__, __LINE__, resp->cgi.window_update);
+                if (resp->cgi.window_update > 32000)
+                {
+                    if (conf->PrintDebugMsg)
+                        print_err(resp, "<%s:%d> ??? resp->cgi.window_update(%ld) > 32000\n", __func__, __LINE__, resp->cgi.window_update);
+                }
+
+                if (resp->frame_win_update.size() == 0)
+                    set_frame_window_update(resp, resp->cgi.window_update);
+                int ret = send_window_update(con, resp);
+                if (ret < 0)
+                    return ret;
             }
 
-            if (resp->frame_win_update.size() == 0)
-                set_frame_window_update(resp, resp->cgi.window_update);
-            return send_window_update(con, resp);
-        }
+            if (resp->headers.size())
+            {
+                int ret = send_frame_headers(con, resp);
+                if (ret < 0)
+                    return ret;
+            }
 
-        if (resp->headers.size())
-            return send_frame_headers(con, resp);
-        else if (resp->send_headers && (!resp->send_end_stream))
-            return send_frame_data(con, resp);
-        else
-        {
-            print_err(con, "<%s:%d> !!! id=%d \n", __func__, __LINE__, resp->id);
+            if (resp->send_headers && (!resp->send_end_stream))
+            {
+                int ret = send_frame_data(con, resp);
+                if (ret < 0)
+                    return ret;
+            }
+
+            if (con->h2.work_stream)
+                con->h2.work_stream = con->h2.work_stream->next;
+            else
+                break;
+            resp = con->h2.work_stream;
         }
     }
     else
     {
-        print_err(con, "<%s:%d> !!! Error: type operation (%s)\n", __func__, __LINE__, get_str_operation(con->h2.con_status));
+        print_err(con, "<%s:%d> !!! Error: connections status (%s)\n", __func__, __LINE__, get_str_operation(con->h2.con_status));
         return -1;
     }
 
@@ -597,7 +611,9 @@ int EventHandlerClass::send_frame_headers(Connect *con, Stream *resp)
         if (ret < 0)
         {
             if (ret == ERR_TRY_AGAIN)
-                print_err(resp, "<%s:%d> Error send frame HEADERS: SSL_ERROR_WANT_WRITE, id=%d \n", __func__, __LINE__, resp->id);
+            {
+                //print_err(resp, "<%s:%d> Error send frame HEADERS: SSL_ERROR_WANT_WRITE, id=%d \n", __func__, __LINE__, resp->id);
+            }
             else
                 print_err(resp, "<%s:%d> Error send frame HEADERS: %d, id=%d \n", __func__, __LINE__, ret, resp->id);
             return ret;
@@ -828,7 +844,7 @@ int EventHandlerClass::send_window_update(Connect *con, Stream *resp)
     int ret = 0;
     if ((ret = write_to_client(con, resp->frame_win_update.ptr(), resp->frame_win_update.size(), resp->id)) <= 0)
     {
-        print_err(con, "<%s:%d> Error send frame WINDOW_UPDATE: %d, %d, id=%d \n", __func__, __LINE__, ret, resp->frame_win_update.size(), resp->id);
+        print_err(resp, "<%s:%d> Error send frame WINDOW_UPDATE: %d, %d, id=%d \n", __func__, __LINE__, ret, resp->frame_win_update.size(), resp->id);
         return ret;
     }
 
@@ -839,104 +855,6 @@ int EventHandlerClass::send_window_update(Connect *con, Stream *resp)
 
     return 0;
 }
-//======================================================================
-const char *huf_map[][2] = {
-                        {" ", "010100"},
-                        {"!", "1111111000"},
-                        {"\"", "1111111001"},
-                        {"#", "111111111010"},
-                        {"$", "1111111111001"},
-                        {"%%", "010101"},
-                        {"&", "11111000"},
-                        {"'", "11111111010"},
-                        {"(", "1111111010"},
-                        {")", "1111111011"},
-                        {"*", "11111001"},
-                        {"+", "11111111011"},
-                        {",", "11111010"},
-                        {"-", "010110"},
-                        {".", "010111"},
-                        {"/", "011000"},
-                        {"0", "00000"},
-                        {"1", "00001"},
-                        {"2", "00010"},
-                        {"3", "011001"},
-                        {"4", "011010"},
-                        {"5", "011011"},
-                        {"6", "011100"},
-                        {"7", "011101"},
-                        {"8", "011110"},
-                        {"9", "011111"},
-                        {":", "1011100"},
-                        {";", "11111011"},
-                        {"<", "111111111111100"},
-                        {"=", "100000"},
-                        {">", "111111111011"},
-                        {"?", "1111111100"},
-                        {"@", "1111111111010"},
-                        {"A", "100001"},
-                        {"B", "1011101"},
-                        {"C", "1011110"},
-                        {"D", "1011111"},
-                        {"E", "1100000"},
-                        {"F", "1100001"},
-                        {"G", "1100010"},
-                        {"H", "1100011"},
-                        {"I", "1100100"},
-                        {"J", "1100101"},
-                        {"K", "1100110"},
-                        {"L", "1100111"},
-                        {"M", "1101000"},
-                        {"N", "1101001"},
-                        {"O", "1101010"},
-                        {"P", "1101011"},
-                        {"Q", "1101100"},
-                        {"R", "1101101"},
-                        {"S", "1101110"},
-                        {"T", "1101111"},
-                        {"U", "1110000"},
-                        {"V", "1110001"},
-                        {"W", "1110010"},
-                        {"X", "11111100"},
-                        {"Y", "1110011"},
-                        {"Z", "11111101"},
-                        {"[", "1111111111011"},
-                        {"\\", "1111111111111110000"},
-                        {"]", "1111111111100"},
-                        {"^", "11111111111100"},
-                        {"_", "100010"},
-                        {"`", "111111111111101"},
-                        {"a", "00011"},
-                        {"b", "100011"},
-                        {"c", "00100"},
-                        {"d", "100100"},
-                        {"e", "00101"},
-                        {"f", "100101"},
-                        {"g", "100110"},
-                        {"h", "100111"},
-                        {"i", "00110"},
-                        {"j", "1110100"},
-                        {"k", "1110101"},
-                        {"l", "101000"},
-                        {"m", "101001"},
-                        {"n", "101010"},
-                        {"o", "00111"},
-                        {"p", "101011"},
-                        {"q", "1110110"},
-                        {"r", "101100"},
-                        {"s", "01000"},
-                        {"t", "01001"},
-                        {"u", "101101"},
-                        {"v", "1110111"},
-                        {"w", "1111000"},
-                        {"x", "1111001"},
-                        {"y", "1111010"},
-                        {"z", "1111011"},
-                        {"{", "111111111111110"},
-                        {"|", "11111111100"},
-                        {"}", "11111111111101"},
-                        {"~", "1111111111101"},
-                        {NULL, NULL}};
 //======================================================================
 const char *static_tab[][2] = {
                          {"", ""},

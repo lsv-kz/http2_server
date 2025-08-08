@@ -197,13 +197,7 @@ Stream *http2::get(int id)
 //----------------------------------------------------------------------
 Stream *http2::get()
 {
-    if (start_stream)
-    {
-        Stream *rtmp = start_stream;
-        return rtmp;
-    }
-    else
-        return NULL;
+    return start_stream;
 }
 //----------------------------------------------------------------------
 int http2::size()
@@ -359,7 +353,8 @@ int http2::parse(Stream *r)
             int ind = bytes_to_int(ch & 0x3f, 6, body.ptr(), &len, body.size());
             if (get_header(ind, name, val, &len) < 0)
                 return -1;
-            dyn_tab.add(name.c_str(), val.c_str());
+            if (conf->HeaderTableSize > 0)
+                dyn_tab.add(name.c_str(), val.c_str());
         }
         else if ((ch >= 0x00) && (ch <= 0x0f))
         {// <0x00><len><name><len><val>, <0x01 ... 0x0F><index><len><val>
