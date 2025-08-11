@@ -2,6 +2,7 @@
 #define BYTESARRAY_H_
 
 #include <iostream>
+#include <cstring>
 
 //======================================================================
 class ByteArray

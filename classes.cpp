@@ -269,7 +269,7 @@ int http2::get_str(std::string& str, int *len)
     }
 
     if (huffman)
-        huff.decode_bytearray(body.ptr() + *len, val_len, str);
+        huffman_decode(body.ptr() + *len, val_len, str);
     else
         str.assign(body.ptr() + *len, val_len);
     (*len) += val_len;

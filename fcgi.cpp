@@ -1,7 +1,6 @@
 #include "main.h"
 
 using namespace std;
-
 //======================================================================
 void fcgi_set_header(ByteArray* ba, unsigned char type)
 {

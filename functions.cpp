@@ -1,7 +1,6 @@
 #include "main.h"
 
 using namespace std;
-
 //======================================================================
 string get_time()
 {
@@ -556,6 +555,34 @@ int int_to_bytes(int data, int pref_len, ByteArray& buf)
     return ret;
 }
 //======================================================================
+int int_to_bytes(ByteArray& buf, int data, int pref_len, int mask)
+{
+    int ret = 0;
+    
+    if (data < (pow_(2, pref_len) - 1))
+    {
+        buf.cat((data | mask));
+        ++ret;
+    }
+    else
+    {
+        buf.cat((pow_(2, pref_len) - 1) | mask);
+        ++ret;
+        data = data - (pow_(2, pref_len) - 1);
+        while (data > 128)
+        {
+            buf.cat(data % 128 + 128);
+            ++ret;
+            data = data / 128;
+        }
+
+        buf.cat((char)data);
+        ++ret;
+    }
+
+    return ret;
+}
+//======================================================================
 void set_frame(Stream *resp, char *s, int len, int type, HTTP2_FLAGS flags, int id)
 {
     s[0] = (len>>16) & 0xff;
@@ -587,10 +614,50 @@ void add_header(Stream *resp, int ind)
 {
     if ((ind >= 8) && (ind <= 14))
         resp->status = atoi(static_tab[ind][1]);
-    char s[8];
-    s[0] = (ind | 0x80);
-    resp->headers.cat(s, 1);
+    resp->headers.cat(ind | 0x80);
     int len = resp->headers.size() - 9;
+    resp->headers.set_byte((len>>16) & 0xff, 0);
+    resp->headers.set_byte((len>>8) & 0xff, 1);
+    resp->headers.set_byte(len & 0xff, 2);
+}
+//======================================================================
+void add_header(Stream *resp, int ind, int mask, const char *val, bool huffman)
+{
+    if ((ind >= 8) && (ind <= 14))
+        resp->status = atoi(val);
+    int len = (int)strlen(val);
+    int prefix_len;
+    switch (mask)
+    {
+        case 0x40:
+            prefix_len = 6;
+            break;
+        case 0x10:
+            prefix_len = 4;
+            break;
+        case 0x00:
+            prefix_len = 4;
+            break;
+        default:
+            prefix_len = 6;
+            mask = 0x40;
+    }
+
+    int_to_bytes(resp->headers, ind, prefix_len, mask);
+
+    if (huffman)
+    {
+        ByteArray buf;
+        huffman_encode(val, buf);
+        int_to_bytes(resp->headers, buf.size(), 7, 0x80);
+        resp->headers.cat(buf.ptr(), buf.size());
+    }
+    else
+    {
+        int_to_bytes(resp->headers, len, 7, 0);
+        resp->headers.cat(val, len);
+    }
+    len = resp->headers.size() - 9;
     resp->headers.set_byte((len>>16) & 0xff, 0);
     resp->headers.set_byte((len>>8) & 0xff, 1);
     resp->headers.set_byte(len & 0xff, 2);
@@ -598,33 +665,8 @@ void add_header(Stream *resp, int ind)
 //======================================================================
 void add_header(Stream *resp, int ind, const char *val)
 {
-    if ((ind >= 8) && (ind <= 14))
-        resp->status = atoi(val);
-    int len = (int)strlen(val);
-    int_to_bytes(ind, 4, resp->headers);
-    int_to_bytes(len, 7, resp->headers);
-    resp->headers.cat(val, len);
-    len = resp->headers.size() - 9;
-    resp->headers.set_byte((len>>16) & 0xff, 0);
-    resp->headers.set_byte((len>>8) & 0xff, 1);
-    resp->headers.set_byte(len & 0xff, 2);
+    add_header(resp, ind, hpack_mask, val, true);
 }
-//======================================================================
-/*void add_header(Stream *resp, int ind, const char *val)
-{
-    if ((ind >= 8) && (ind <= 14))
-        resp->status = atoi(val);
-    int len = (int)strlen(val);
-    char s[8];
-    s[0] = (ind | 0x40);
-    s[1] = (char)len;
-    resp->headers.cat(s, 2);
-    resp->headers.cat(val, len);
-    len = resp->headers.size() - 9;
-    resp->headers.set_byte((len>>16) & 0xff, 0);
-    resp->headers.set_byte((len>>8) & 0xff, 1);
-    resp->headers.set_byte(len & 0xff, 2);
-}*/
 //======================================================================
 void set_frame_window_update(Stream *resp, int len)
 {

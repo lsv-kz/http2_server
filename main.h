@@ -57,6 +57,7 @@ const int  LIMIT_PARSE_REQ_THREADS = 128;
 const int  MAX_STREAM = 128;
 
 const char proto_alpn[] = { 2, 'h', '2' };
+const int hpack_mask = 0x40;
 
 enum { // request status
     RS101 = 101,
@@ -178,7 +179,6 @@ struct http2
 
 private:
 
-    HuffmanCode huff;
     int max_streams;    //SETTINGS_MAX_CONCURRENT_STREAMS (0x3)
     int num_streams;
     int err;
@@ -332,6 +332,7 @@ int strlcmp_case(const char *s1, const char *s2, int len);
 int strcmp_case(const char *s1, const char *s2);
 int pow_(int x, int y);
 int bytes_to_int(unsigned char prefix, int pref_len, const char *s, int *len, int size);
+int int_to_bytes(ByteArray& buf, int data, int pref_len, int mask);
 
 const char *get_str_frame_type(FRAME_TYPE);
 const char *get_str_operation(CONNECT_STATUS);
@@ -377,6 +378,9 @@ void close_logs();
 void print_err(const char *format, ...);
 void print_err(Connect *c, const char *format, ...);
 void print_err(Stream *r, const char *format, ...);
+//----------------------------------------------------------------------
+void huffman_encode(const char *s, ByteArray& out);
+int huffman_decode(const char *s, int len, std::string& s_out);
 //----------------------------------------------------------------------
 void close_conn();
 //----------------------------------------------------------------------

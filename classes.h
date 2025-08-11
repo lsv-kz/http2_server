@@ -3,7 +3,7 @@
 #define _FILE_OFFSET_BITS 64
 
 #include <iostream>
-#include "huffman.h"
+#include "bytes_array.h"
 //======================================================================
 struct Header
 {
@@ -321,7 +321,7 @@ public:
     {
         if (table)
         {
-            fprintf(stderr, "<%s:%d> ~~~ Delete Dynamic Table\n", __func__, __LINE__);
+            //fprintf(stderr, "<%s:%d> ~~~ Delete Dynamic Table\n", __func__, __LINE__);
             delete [] table;
             table = NULL;
         }

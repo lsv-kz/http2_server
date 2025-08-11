@@ -7,9 +7,10 @@ CC = c++
 OBJSDIR = objs
 #$(shell mkdir -p $(OBJSDIR))
 
-DEPS = main.h string__.h classes.h bytes_array.h huffman.h
+DEPS = main.h string__.h classes.h bytes_array.h
 
 OBJS = $(OBJSDIR)/http2_server.o \
+	$(OBJSDIR)/huffman_code.o \
 	$(OBJSDIR)/fcgi.o \
 	$(OBJSDIR)/cgi.o \
 	$(OBJSDIR)/scgi.o \
@@ -30,6 +31,9 @@ http2_server: $(OBJS)
 
 $(OBJSDIR)/http2_server.o: http2_server.cpp $(DEPS)
 	$(CC) $(CFLAGS) -c http2_server.cpp -o $@
+
+$(OBJSDIR)/huffman_code.o: huffman_code.cpp $(DEPS)
+	$(CC) $(CFLAGS) -c huffman_code.cpp -o $@
 
 $(OBJSDIR)/fcgi.o: fcgi.cpp $(DEPS)
 	$(CC) $(CFLAGS) -c fcgi.cpp -o $@
