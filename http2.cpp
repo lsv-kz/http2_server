@@ -218,7 +218,7 @@ int EventHandlerClass::recv_frame_(Connect *con)
                         n += ((unsigned char)con->h2.body.get_byte(ind + 4)<<8);
                         n += ((unsigned char)con->h2.body.get_byte(ind + 3)<<16);
                         n += ((unsigned char)con->h2.body.get_byte(ind + 2)<<24);
-                        //if (conf->PrintDebugMsg)
+                        if (conf->PrintDebugMsg)
                             print_err(con, "<%s:%d> SETTINGS_HEADER_TABLE_SIZE [%ld] id=%d \n", __func__, __LINE__, n, 0);
                     }
                     else if (con->h2.body.get_byte(ind + 1) == 4)
