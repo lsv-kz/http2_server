@@ -970,20 +970,20 @@ int set_response(Connect *con, Stream *resp)
         //----------- frame headers ----------------
         set_frame_headers(resp);
         if (resp->range.size())
-            add_header(resp, 10);
+            add_header(resp, 10);                                     // "206 Partial Content"
         else
-            add_header(resp, 8);
-        add_header(resp, 54, conf->ServerSoftware.c_str());
-        add_header(resp, 33, get_time().c_str());
+            add_header(resp, 8);                                      // "200 OK"
+        add_header(resp, 54, conf->ServerSoftware.c_str());           // "server"
+        add_header(resp, 33, get_time().c_str());                     // "date"
         const char  *cont_type = content_type(resp->path.c_str());
         if (cont_type)
-            add_header(resp, 31, cont_type);
+            add_header(resp, 31, cont_type);                          // "content-type"
 
         char s[128];
         snprintf(s, sizeof(s), "%lld", resp->send_cont_length);
-        add_header(resp, 28, s);
-        add_header(resp, 18, "bytes");
-        add_header(resp, 24, "no-cache, no-store, must-revalidate");
+        add_header(resp, 28, s);                                      // "content-length"
+        add_header(resp, 18, "bytes");                                // "accept-ranges"
+        add_header(resp, 24, "no-cache, no-store, must-revalidate");  // "cache-control"
 
         if (resp->file_size == 0)
         {
@@ -997,7 +997,7 @@ int set_response(Connect *con, Stream *resp)
             char s[128];
             snprintf(s, sizeof(s), "bytes %lld-%lld/%lld", resp->offset, resp->offset + resp->send_cont_length - 1, resp->file_size);
             resp->file_size = resp->send_cont_length;
-            add_header(resp, 30, s);
+            add_header(resp, 30, s);                                  // "content-range"
         }
 
         resp->create_headers = true;
@@ -1022,11 +1022,11 @@ int set_response(Connect *con, Stream *resp)
         if (resp->decode_path[resp->decode_path.size() - 1] != '/')
         {
             set_frame_headers(resp);
-            add_header(resp, 8, "301");
-            add_header(resp, 54, conf->ServerSoftware.c_str());
-            add_header(resp, 33, get_time().c_str());
-            add_header(resp, 46, resp->path.append("/").c_str());
-            add_header(resp, 31, "text/plain");
+            add_header(resp, 8, "301");                               // "301 Moved Permanently"
+            add_header(resp, 54, conf->ServerSoftware.c_str());       // "server"
+            add_header(resp, 33, get_time().c_str());                 // "date"
+            add_header(resp, 46, resp->path.append("/").c_str());     // "location"
+            add_header(resp, 31, "text/plain");                       // "content-type"
             resp->create_headers = true;
 
             ByteArray smg;
@@ -1035,7 +1035,7 @@ int set_response(Connect *con, Stream *resp)
 
             char s[128];
             snprintf(s, sizeof(s), "%d", smg.size());
-            add_header(resp, 28, s);
+            add_header(resp, 28, s);                                  // "content-length"
 
             set_frame_data(resp, smg.size(), FLAG_END_STREAM);
             resp->data.cat(smg.ptr(), smg.size());
@@ -1051,10 +1051,11 @@ int set_response(Connect *con, Stream *resp)
         }
         //------------- headers frame --------------
         set_frame_headers(resp);
-        add_header(resp, 8);
-        add_header(resp, 54, conf->ServerSoftware.c_str());
-        add_header(resp, 33, get_time().c_str());
-        add_header(resp, 31, "text/html");
+        add_header(resp, 8);                                          // "200 OK"
+        add_header(resp, 54, conf->ServerSoftware.c_str());           // "server"
+        add_header(resp, 33, get_time().c_str());                     // "date"
+        add_header(resp, 31, "text/html");                            // "content-type"
+        add_header(resp, 24, "no-cache, no-store, must-revalidate");  // "cache-control"
         resp->create_headers = true;
     }
     else if (resp->content == DYN_PAGE)

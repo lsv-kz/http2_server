@@ -314,7 +314,9 @@ int http2::parse(Stream *r)
     if (flags & 0x20) // PRIORITY (0x20)
         len += 5;
     std::string name;
+    name.reserve(80);
     std::string val;
+    val.reserve(80);
 
     for ( ; len < body.size(); )
     {
