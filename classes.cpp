@@ -40,9 +40,16 @@ http2::~http2()
     {
         next = r->next;
         print_log(r);
-        //if (conf->PrintDebugMsg)
+        if (conf->PrintDebugMsg)
             print_err("<%s:%d>~~~~~~~ Close Stream, id=%d \n", __func__, __LINE__, r->id);
         delete r;
+    }
+
+    FrameRedySend *fr = start_list_send_frame, *fr_next = NULL;
+    for ( ; fr; fr = fr_next)
+    {
+        fr_next = fr->next;
+        delete fr;
     }
 
     if (conf->PrintDebugMsg)
@@ -314,9 +321,9 @@ int http2::parse(Stream *r)
     if (flags & 0x20) // PRIORITY (0x20)
         len += 5;
     std::string name;
-    name.reserve(80);
+    name.reserve(32);
     std::string val;
-    val.reserve(80);
+    val.reserve(128);
 
     for ( ; len < body.size(); )
     {
@@ -355,6 +362,7 @@ int http2::parse(Stream *r)
             int ind = bytes_to_int(ch & 0x3f, 6, body.ptr(), &len, body.size());
             if (get_header(ind, name, val, &len) < 0)
                 return -1;
+//fprintf(stderr, "<%s:%d> [%s: %s]\n", __func__, __LINE__, name.c_str(), val.c_str());
             if (conf->HeaderTableSize > 0)
                 dyn_tab.add(name.c_str(), val.c_str());
         }
@@ -374,7 +382,7 @@ int http2::parse(Stream *r)
         else if ((ch >= 0x20) && (ch <= 0x3f))
         {// Dynamic Table Size Update
             int size = bytes_to_int(ch & 0x1f, 5, body.ptr(), &len, body.size());
-            fprintf(stderr, "<%s:%d>--- Dynamic Table Size Update: %d ---\n", __func__, __LINE__, size);
+            fprintf(stderr, "[%lu/%lu] <%s:%d>--- Dynamic Table Size Update: %d ---\n", r->numConn, r->numReq, __func__, __LINE__, size);
             continue;
         }
         else
@@ -382,8 +390,7 @@ int http2::parse(Stream *r)
             fprintf(stderr, "<%s:%d> !!! 0x%02X\n", __func__, __LINE__, ch);
             return -1;
         }
-
-        //fprintf(stderr, "<%s:%d> [%s: %s]\n", __func__, __LINE__, name.c_str(), val.c_str());
+    //fprintf(stderr, "[%lu/%lu] <%s:%d> [%s: %s]\n", r->numConn, r->numReq, __func__, __LINE__, name.c_str(), val.c_str());
         if (name == "method")
         {
             if (strstr_case(val.c_str(), "post"))

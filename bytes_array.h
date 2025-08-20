@@ -7,9 +7,6 @@
 //======================================================================
 class ByteArray
 {
-    ByteArray *prev;
-    ByteArray *next;
-
     char *buf;
     int buf_size;
     int buf_len;
@@ -48,7 +45,6 @@ public:
     {
         buf = NULL;
         buf_size = buf_len = offset = 0;
-        prev = next = NULL;
     }
     //------------------------------------------------------------------
     ~ByteArray()

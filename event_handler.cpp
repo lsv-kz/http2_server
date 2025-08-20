@@ -253,7 +253,7 @@ int EventHandlerClass::cgi_poll()
             if (poll_ind >= num_cgi_poll)
             {
                 print_err(c, "<%s:%d> !!! n=%d, poll_ind(%d)>=num_cgi_poll(%d), c->h2.num_cgi=%d,  id=%d \n", __func__, __LINE__, n, poll_ind, num_cgi_poll, c->h2.num_cgi, resp->id);
-                exit(11);
+                return -1;
             }
 
             int fd = poll_fd[poll_ind].fd;
@@ -462,7 +462,7 @@ int EventHandlerClass::http2_poll()
         int revents = poll_fd[conn_ind].revents;
         if (revents & ((~POLLIN) & (~POLLOUT)))
         {
-            print_err(con, "<%s:%d> !!! Error: revents=0x%02x, %s\n", __func__, __LINE__, revents, get_str_operation(con->h2.con_status));
+            print_err(con, "<%s:%d> !!! Error: events=0x%02x, revents=0x%02x, %s\n", __func__, __LINE__, poll_fd[conn_ind].events, revents, get_str_operation(con->h2.con_status));
             if ((con->h2.con_status == SSL_ACCEPT) || 
                 (con->h2.con_status == SSL_SHUTDOWN))
             {
@@ -518,7 +518,7 @@ void EventHandlerClass::close_connect(Connect *con)
 
     if (con->tls.ssl)
     {
-        //SSL_clear(con->tls.ssl);
+        SSL_clear(con->tls.ssl);
         SSL_free(con->tls.ssl);
     }
 

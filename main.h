@@ -244,6 +244,7 @@ class EventHandlerClass
 
     int recv_frame(Connect *c);
     int recv_frame_(Connect *c);
+    int parse_frame(Connect *c);
 
     void send_frames(Connect *c);
     int send_frames_(Connect *c);

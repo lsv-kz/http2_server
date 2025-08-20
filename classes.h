@@ -7,8 +7,8 @@
 //======================================================================
 struct Header
 {
-    std::string name;
-    std::string val;
+    char *name;
+    char *val;
 };
 
 struct Param
@@ -315,6 +315,9 @@ public:
             err = 1;
             return;
         }
+
+        table[0].name = NULL;
+        table[0].val = NULL;
     }
     //------------------------------------------------------------------
     ~DynamicTable()
@@ -322,24 +325,61 @@ public:
         if (table)
         {
             //fprintf(stderr, "<%s:%d> ~~~ Delete Dynamic Table\n", __func__, __LINE__);
+            for ( int i = 0; i < table_len; ++i)
+            {
+                if (table[i].name && table[i].val)
+                {
+                    delete [] table[i].name;
+                    delete [] table[i].val;
+                }
+            }
             delete [] table;
             table = NULL;
         }
     }
     //------------------------------------------------------------------
-    void add(const char *name, const char *val)
+    int add(const char *name, const char *val)
     {
         if (table_size == 0)
-            return;
+            return 0;
         if (table_len == table_size)
+        {
             --table_len;
+            delete [] table[table_len].name;
+            table[table_len].name = NULL;
+            delete [] table[table_len].val;
+            table[table_len].val = NULL;
+        }
+
         for ( int i = table_len; i > 0; --i)
         {
             table[i] = table[i - 1];
         }
 
-        table[0] = Header{name, val};
+        table[0].name = NULL;
+        table[0].val = NULL;
+
+        int len = strlen(name);
+        char *n = new(std::nothrow) char [len + 1];
+        if (!n)
+        {
+            return -1;
+        }
+        memcpy(n, name, len + 1);
+        
+        len = strlen(val);
+        char *v = new(std::nothrow) char [len + 1];
+        if (!v)
+        {
+            delete [] n;
+            return -1;
+        }
+        memcpy(v, val, len + 1);
+
+        table[0].name = n;
+        table[0].val = v;
         ++table_len;
+        return 0;
     }
     //------------------------------------------------------------------
     void print()
@@ -347,7 +387,7 @@ public:
         fprintf(stderr, " -------- Dynamic table %d --------\n", table_len);
         for ( int i = 0; i < table_len; ++i)
         {
-            fprintf(stderr, " %04d  name: %s, val: %s\n", i + offset, table[i].name.c_str(), table[i].val.c_str());
+            fprintf(stderr, " %04d  [%s: %s]\n", i + offset, table[i].name, table[i].val);
         }
     }
     //------------------------------------------------------------------

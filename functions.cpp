@@ -982,6 +982,7 @@ int set_response(Connect *con, Stream *resp)
         char s[128];
         snprintf(s, sizeof(s), "%lld", resp->send_cont_length);
         add_header(resp, 28, s);                                      // "content-length"
+
         add_header(resp, 18, "bytes");                                // "accept-ranges"
         add_header(resp, 24, "no-cache, no-store, must-revalidate");  // "cache-control"
 
@@ -1439,7 +1440,7 @@ void hex_print_stderr(const char *s, int line, const void *p, int n)
     int count, addr = 0, col;
     unsigned char *buf = (unsigned char*)p;
     char str[18];
-    fprintf(stderr, "<%s:%d>--------------------------------\n", s, line);
+    fprintf(stderr, " [%s] <%d>--------------- HEX -----------------\n", s, line);
     for(count = 0; count < n;)
     {
         fprintf(stderr, "%08X  ", addr);

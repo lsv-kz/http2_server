@@ -33,7 +33,7 @@ class String
             unsigned long n = buf_len + 1;
             if (buf_size <= n)
             {
-                if (reserve(n + n/4 + 16))
+                if (reserve(n + 16))
                     return;
             }
 
@@ -63,7 +63,7 @@ class String
         unsigned long n = buf_len + len;
         if (buf_size <= n)
         {
-            if (reserve(n + n/4 + 16))
+            if (reserve(n + 64))
                 return;
         }
 

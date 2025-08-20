@@ -1,8 +1,8 @@
-CFLAGS = -Wall -O2 -g -std=c++11
+CFLAGS = -Wall -O2 -std=c++11
 
 CC = c++
 
-#CC = clang++
+#CC = clang++ -g
 
 OBJSDIR = objs
 #$(shell mkdir -p $(OBJSDIR))
