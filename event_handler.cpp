@@ -337,13 +337,13 @@ void EventHandlerClass::http2_set_poll()
         }
         else
         {
-            int ret = 0;
-            while ((c->ssl_pending = SSL_pending(c->tls.ssl)) && (c->h2.con_status != SEND_SETTINGS))
+            int ret = 0, pending = 0;
+            while ((pending = SSL_pending(c->tls.ssl)) && (c->h2.con_status != SEND_SETTINGS))
             {
                 if (conf->PrintDebugMsg)
                 {
                     print_err(c, "<%s:%d> ***** SSL_pending()=%d, %s\n", __func__, __LINE__, 
-                                c->ssl_pending, get_str_operation(c->h2.con_status));
+                                pending, get_str_operation(c->h2.con_status));
                 }
 
                 if ((c->h2.con_status == RECV_SETTINGS) || (c->h2.con_status == PROCESSING_REQUESTS))

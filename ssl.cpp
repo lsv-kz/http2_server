@@ -119,7 +119,7 @@ int ssl_read(Connect *con, char *buf, int len)
         con->tls.err = SSL_get_error(con->tls.ssl, ret);
         if (con->tls.err == SSL_ERROR_ZERO_RETURN)
         {
-            if (conf->PrintDebugMsg)
+            //if (conf->PrintDebugMsg)
                 print_err(con, "<%s:%d> Error SSL_read(): SSL_ERROR_ZERO_RETURN\n", __func__, __LINE__);
             return 0;
         }

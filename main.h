@@ -204,7 +204,6 @@ public:
     int    clientSocket;
     time_t sock_timer;
 
-    int ssl_pending;
     int fd_revents;
     int fd_events;
 

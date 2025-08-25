@@ -567,7 +567,7 @@ int EventHandlerClass::send_frames_(Connect *con)
             }
         }
 
-        for ( ; resp; )
+        for ( ; resp; resp = con->h2.work_stream)
         {
             if (resp->frame_win_update.size() || (resp->cgi.window_update > 0))
             {
@@ -600,9 +600,6 @@ int EventHandlerClass::send_frames_(Connect *con)
 
             if (con->h2.work_stream)
                 con->h2.work_stream = con->h2.work_stream->next;
-            else
-                break;
-            resp = con->h2.work_stream;
         }
     }
     else

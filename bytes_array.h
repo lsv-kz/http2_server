@@ -169,7 +169,7 @@ public:
     //------------------------------------------------------------------
     int get_byte(int i)
     {
-        if ((i >= buf_size) || (i < 0))
+        if ((i >= buf_len) || (i < 0))
             return -1;
         return (unsigned char)buf[i];
     }

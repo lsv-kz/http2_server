@@ -26,9 +26,25 @@ class String
         return 0;
     }
     //------------------------------------------------------------------
+    void append(const unsigned char ch)
+    {
+        if (err == 0)
+        {
+            unsigned long n = buf_len + 1;
+            if (buf_size <= n)
+            {
+                if (reserve(n + 16))
+                    return;
+            }
+
+            buf[buf_len++] = ch;
+            buf[buf_len] = 0;
+        }
+    }
+    //------------------------------------------------------------------
     void append(const char ch)
     {
-        if ((ch > 0) && (err == 0))
+        if (err == 0)
         {
             unsigned long n = buf_len + 1;
             if (buf_size <= n)
@@ -80,6 +96,31 @@ class String
     void append(const String& s)
     {
         append(s.buf, s.buf_len);
+    }
+    //------------------------------------------------------------------
+    template <typename T>
+    void append(T t)
+    {
+        const unsigned long size_ = 21;
+        char s[size_];
+        int cnt, minus = (t < 0) ? 1 : 0;
+        const char *get_char = "FEDCBA9876543210123456789ABCDEF";
+        cnt = 20;
+
+        s[cnt] = 0;
+        while (cnt > 0)
+        {
+            --cnt;
+            s[cnt] = get_char[15 + (t % 10)];
+            t /= 10;
+            if (t == 0)
+                break;
+        }
+
+        if (minus)
+            s[--cnt] = '-';
+        append(s + cnt);
+//fprintf(stdout, "<%s:%d> -------------\n", __func__, __LINE__);
     }
     //------------------------------------------------------------------
     void init()
@@ -157,6 +198,12 @@ public:
         return *this;
     }
     //------------------------------------------------------------------
+    String & operator += (char *s)
+    {
+        append(s);
+        return *this;
+    }
+    //------------------------------------------------------------------
     String & operator += (const String& s)
     {
         append(s);
@@ -200,7 +247,14 @@ public:
         return *this;
     }
     //------------------------------------------------------------------
-    String& operator << (long long ll)
+    template <typename T>
+    String& operator << (T t)
+    {
+        append(t);
+        return *this;
+    }
+    //------------------------------------------------------------------
+    /*String& operator << (long long ll)
     {
         char s[32];
         snprintf(s, sizeof(s), "%lld", ll);
@@ -223,6 +277,22 @@ public:
         append(s);
         return *this;
     }
+    //------------------------------------------------------------------
+    String& operator << (long int li)
+    {
+        char s[32];
+        snprintf(s, sizeof(s), "%ld", li);
+        append(s);
+        return *this;
+    }
+    //------------------------------------------------------------------
+    String& operator << (unsigned int ui)
+    {
+        char s[32];
+        snprintf(s, sizeof(s), "%u", ui);
+        append(s);
+        return *this;
+    }*/
     //------------------------------------------------------------------
     String& operator >> (String& s)
     {
