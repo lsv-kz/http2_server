@@ -105,8 +105,8 @@ static const unsigned int huffman_decode_table[][3] = {
     {130, 0xfffe7000, 20},
     {131, 0xfffe8000, 20},
     {162, 0xfffe9000, 20},
-    {194, 0xfffeb000, 20},
     {184, 0xfffea000, 20},
+    {194, 0xfffeb000, 20},
     {224, 0xfffec000, 20},
     {226, 0xfffed000, 20},
     {153, 0xfffee000, 21},
@@ -263,266 +263,266 @@ static const unsigned int huffman_decode_table[][3] = {
 };
 //======================================================================
 static const unsigned int huffman_encode_table[][3] = {
-    {  0, 0x1ff8, 13},
-    {  1, 0x7fffd8, 23},
-    {  2, 0xfffffe2, 28},
-    {  3, 0xfffffe3, 28},
-    {  4, 0xfffffe4, 28},
-    {  5, 0xfffffe5, 28},
-    {  6, 0xfffffe6, 28},
-    {  7, 0xfffffe7, 28},
-    {  8, 0xfffffe8, 28},
-    {  9, 0xffffea, 24},
+    {  0, 0x00001ff8, 13},
+    {  1, 0x007fffd8, 23},
+    {  2, 0x0fffffe2, 28},
+    {  3, 0x0fffffe3, 28},
+    {  4, 0x0fffffe4, 28},
+    {  5, 0x0fffffe5, 28},
+    {  6, 0x0fffffe6, 28},
+    {  7, 0x0fffffe7, 28},
+    {  8, 0x0fffffe8, 28},
+    {  9, 0x00ffffea, 24},
     { 10, 0x3ffffffc, 30},
-    { 11, 0xfffffe9,28 },
-    { 12, 0xfffffea, 28},
+    { 11, 0x0fffffe9, 28},
+    { 12, 0x0fffffea, 28},
     { 13, 0x3ffffffd, 30},
-    { 14, 0xfffffeb, 28},
-    { 15, 0xfffffec, 28},
-    { 16, 0xfffffed, 28},
-    { 17, 0xfffffee, 28},
-    { 18, 0xfffffef, 28},
-    { 19, 0xffffff0, 28},
-    { 20, 0xffffff1, 28},
-    { 21, 0xffffff2, 28},
+    { 14, 0x0fffffeb, 28},
+    { 15, 0x0fffffec, 28},
+    { 16, 0x0fffffed, 28},
+    { 17, 0x0fffffee, 28},
+    { 18, 0x0fffffef, 28},
+    { 19, 0x0ffffff0, 28},
+    { 20, 0x0ffffff1, 28},
+    { 21, 0x0ffffff2, 28},
     { 22, 0x3ffffffe, 30},
-    { 23, 0xffffff3, 28},
-    { 24, 0xffffff4, 28},
-    { 25, 0xffffff5, 28},
-    { 26, 0xffffff6, 28},
-    { 27, 0xffffff7, 28},
-    { 28, 0xffffff8, 28},
-    { 29, 0xffffff9, 28},
-    { 30, 0xffffffa, 28},
-    { 31, 0xffffffb, 28},
-    { 32, 0x14, 6},
-    { 33, 0x3f8, 10},
-    { 34, 0x3f9, 10},
-    { 35, 0xffa, 12},
-    { 36, 0x1ff9, 13},
-    { 37, 0x15, 6},
-    { 38, 0xf8, 8},
-    { 39, 0x7fa, 11},
-    { 40, 0x3fa, 10},
-    { 41, 0x3fb, 10},
-    { 42, 0xf9, 8},
-    { 43, 0x7fb, 11},
-    { 44, 0xfa, 8},
-    { 45, 0x16, 6},
-    { 46, 0x17, 6},
-    { 47, 0x18, 6},
-    { 48, 0x0, 5},
-    { 49, 0x1, 5},
-    { 50, 0x2, 5},
-    { 51, 0x19, 6},
-    { 52, 0x1a, 6},
-    { 53, 0x1b, 6},
-    { 54, 0x1c, 6},
-    { 55, 0x1d, 6},
-    { 56, 0x1e, 6},
-    { 57, 0x1f, 6},
-    { 58, 0x5c, 7},
-    { 59, 0xfb, 8},
-    { 60, 0x7ffc, 15},
-    { 61, 0x20, 6},
-    { 62, 0xffb, 12},
-    { 63, 0x3fc, 10},
-    { 64, 0x1ffa, 13},
-    { 65, 0x21, 6},
-    { 66, 0x5d, 7},
-    { 67, 0x5e, 7},
-    { 68, 0x5f, 7},
-    { 69, 0x60, 7},
-    { 70, 0x61, 7},
-    { 71, 0x62, 7},
-    { 72, 0x63, 7},
-    { 73, 0x64, 7},
-    { 74, 0x65, 7},
-    { 75, 0x66, 7},
-    { 76, 0x67, 7},
-    { 77, 0x68, 7},
-    { 78, 0x69, 7},
-    { 79, 0x6a, 7},
-    { 80, 0x6b, 7},
-    { 81, 0x6c, 7},
-    { 82, 0x6d, 7},
-    { 83, 0x6e, 7},
-    { 84, 0x6f, 7},
-    { 85, 0x70, 7},
-    { 86, 0x71, 7},
-    { 87, 0x72, 7},
-    { 88, 0xfc, 8},
-    { 89, 0x73, 7},
-    { 90, 0xfd, 8},
-    { 91, 0x1ffb, 13},
-    { 92, 0x7fff0, 19},
-    { 93, 0x1ffc, 13},
-    { 94, 0x3ffc, 14},
-    { 95, 0x22, 6},
-    { 96, 0x7ffd, 15},
-    { 97, 0x3, 5},
-    { 98, 0x23, 6},
-    { 99, 0x4, 5},
-    {100, 0x24, 6},
-    {101, 0x5, 5},
-    {102, 0x25, 6},
-    {103, 0x26, 6},
-    {104, 0x27, 6},
-    {105, 0x6, 5},
-    {106, 0x74, 7},
-    {107, 0x75, 7},
-    {108, 0x28, 6},
-    {109, 0x29, 6},
-    {110, 0x2a, 6},
-    {111, 0x7, 5},
-    {112, 0x2b, 6},
-    {113, 0x76, 7},
-    {114, 0x2c, 6},
-    {115, 0x8, 5},
-    {116, 0x9, 5},
-    {117, 0x2d, 6},
-    {118, 0x77, 7},
-    {119, 0x78, 7},
-    {120, 0x79, 7},
-    {121, 0x7a, 7},
-    {122, 0x7b, 7},
-    {123, 0x7ffe, 15},
-    {124, 0x7fc, 11},
-    {125, 0x3ffd, 14},
-    {126, 0x1ffd, 13},
-    {127, 0xffffffc, 28},
-    {128, 0xfffe6, 20},
-    {129, 0x3fffd2, 22},
-    {130, 0xfffe7, 20},
-    {131, 0xfffe8, 20},
-    {132, 0x3fffd3, 22},
-    {133, 0x3fffd4, 22},
-    {134, 0x3fffd5, 22},
-    {135, 0x7fffd9, 23},
-    {136, 0x3fffd6, 22},
-    {137, 0x7fffda, 23},
-    {138, 0x7fffdb, 23},
-    {139, 0x7fffdc, 23},
-    {140, 0x7fffdd, 23},
-    {141, 0x7fffde, 23},
-    {142, 0xffffeb, 24},
-    {143, 0x7fffdf, 23},
-    {144, 0xffffec, 24},
-    {145, 0xffffed, 24},
-    {146, 0x3fffd7, 22},
-    {147, 0x7fffe0, 23},
-    {148, 0xffffee, 24},
-    {149, 0x7fffe1, 23},
-    {150, 0x7fffe2, 23},
-    {151, 0x7fffe3, 23},
-    {152, 0x7fffe4, 23},
-    {153, 0x1fffdc, 21},
-    {154, 0x3fffd8, 22},
-    {155, 0x7fffe5, 23},
-    {156, 0x3fffd9, 22},
-    {157, 0x7fffe6, 23},
-    {158, 0x7fffe7, 23},
-    {159, 0xffffef, 24},
-    {160, 0x3fffda, 22},
-    {161, 0x1fffdd, 21},
-    {162, 0xfffe9, 20},
-    {163, 0x3fffdb, 22},
-    {164, 0x3fffdc, 22},
-    {165, 0x7fffe8, 23},
-    {166, 0x7fffe9, 23},
-    {167, 0x1fffde, 21},
-    {168, 0x7fffea, 23},
-    {169, 0x3fffdd, 22},
-    {170, 0x3fffde, 22},
-    {171, 0xfffff0, 24},
-    {172, 0x1fffdf, 21},
-    {173, 0x3fffdf, 22},
-    {174, 0x7fffeb, 23},
-    {175, 0x7fffec, 23},
-    {176, 0x1fffe0, 21},
-    {177, 0x1fffe1, 21},
-    {178, 0x3fffe0, 22},
-    {179, 0x1fffe2, 21},
-    {180, 0x7fffed, 23},
-    {181, 0x3fffe1, 22},
-    {182, 0x7fffee, 23},
-    {183, 0x7fffef, 23},
-    {184, 0xfffea, 20},
-    {185, 0x3fffe2, 22},
-    {186, 0x3fffe3, 22},
-    {187, 0x3fffe4, 22},
-    {188, 0x7ffff0, 23},
-    {189, 0x3fffe5, 22},
-    {190, 0x3fffe6, 22},
-    {191, 0x7ffff1, 23},
-    {192, 0x3ffffe0, 26},
-    {193, 0x3ffffe1, 26},
-    {194, 0xfffeb, 20},
-    {195, 0x7fff1, 19},
-    {196, 0x3fffe7, 22},
-    {197, 0x7ffff2, 23},
-    {198, 0x3fffe8, 22},
-    {199, 0x1ffffec, 25},
-    {200, 0x3ffffe2, 26},
-    {201, 0x3ffffe3, 26},
-    {202, 0x3ffffe4, 26},
-    {203, 0x7ffffde, 27},
-    {204, 0x7ffffdf, 27},
-    {205, 0x3ffffe5, 26},
-    {206, 0xfffff1, 24},
-    {207, 0x1ffffed, 25},
-    {208, 0x7fff2, 19},
-    {209, 0x1fffe3, 21},
-    {210, 0x3ffffe6, 26},
-    {211, 0x7ffffe0, 27},
-    {212, 0x7ffffe1, 27},
-    {213, 0x3ffffe7, 26},
-    {214, 0x7ffffe2, 27},
-    {215, 0xfffff2, 24},
-    {216, 0x1fffe4, 21},
-    {217, 0x1fffe5, 21},
-    {218, 0x3ffffe8, 26},
-    {219, 0x3ffffe9, 26},
-    {220, 0xffffffd, 28},
-    {221, 0x7ffffe3, 27},
-    {222, 0x7ffffe4, 27},
-    {223, 0x7ffffe5, 27},
-    {224, 0xfffec, 20},
-    {225, 0xfffff3, 24},
-    {226, 0xfffed, 20},
-    {227, 0x1fffe6, 21},
-    {228, 0x3fffe9, 22},
-    {229, 0x1fffe7, 21},
-    {230, 0x1fffe8, 21},
-    {231, 0x7ffff3, 23},
-    {232, 0x3fffea, 22},
-    {233, 0x3fffeb, 22},
-    {234, 0x1ffffee, 25},
-    {235, 0x1ffffef, 25},
-    {236, 0xfffff4, 24},
-    {237, 0xfffff5, 24},
-    {238, 0x3ffffea, 26},
-    {239, 0x7ffff4, 23},
-    {240, 0x3ffffeb, 26},
-    {241, 0x7ffffe6, 27},
-    {242, 0x3ffffec, 26},
-    {243, 0x3ffffed, 26},
-    {244, 0x7ffffe7, 27},
-    {245, 0x7ffffe8, 27},
-    {246, 0x7ffffe9, 27},
-    {247, 0x7ffffea, 27},
-    {248, 0x7ffffeb, 27},
-    {249, 0xffffffe, 28},
-    {250, 0x7ffffec, 27},
-    {251, 0x7ffffed, 27},
-    {252, 0x7ffffee, 27},
-    {253, 0x7ffffef, 27},
-    {254, 0x7fffff0, 27},
-    {255, 0x3ffffee, 26},
+    { 23, 0x0ffffff3, 28},
+    { 24, 0x0ffffff4, 28},
+    { 25, 0x0ffffff5, 28},
+    { 26, 0x0ffffff6, 28},
+    { 27, 0x0ffffff7, 28},
+    { 28, 0x0ffffff8, 28},
+    { 29, 0x0ffffff9, 28},
+    { 30, 0x0ffffffa, 28},
+    { 31, 0x0ffffffb, 28},
+    { 32, 0x00000014, 6},
+    { 33, 0x000003f8, 10},
+    { 34, 0x000003f9, 10},
+    { 35, 0x00000ffa, 12},
+    { 36, 0x00001ff9, 13},
+    { 37, 0x00000015, 6},
+    { 38, 0x000000f8, 8},
+    { 39, 0x000007fa, 11},
+    { 40, 0x000003fa, 10},
+    { 41, 0x000003fb, 10},
+    { 42, 0x000000f9, 8},
+    { 43, 0x000007fb, 11},
+    { 44, 0x000000fa, 8},
+    { 45, 0x00000016, 6},
+    { 46, 0x00000017, 6},
+    { 47, 0x00000018, 6},
+    { 48, 0x00000000, 5},
+    { 49, 0x00000001, 5},
+    { 50, 0x00000002, 5},
+    { 51, 0x00000019, 6},
+    { 52, 0x0000001a, 6},
+    { 53, 0x0000001b, 6},
+    { 54, 0x0000001c, 6},
+    { 55, 0x0000001d, 6},
+    { 56, 0x0000001e, 6},
+    { 57, 0x0000001f, 6},
+    { 58, 0x0000005c, 7},
+    { 59, 0x000000fb, 8},
+    { 60, 0x00007ffc, 15},
+    { 61, 0x00000020, 6},
+    { 62, 0x00000ffb, 12},
+    { 63, 0x000003fc, 10},
+    { 64, 0x00001ffa, 13},
+    { 65, 0x00000021, 6},
+    { 66, 0x0000005d, 7},
+    { 67, 0x0000005e, 7},
+    { 68, 0x0000005f, 7},
+    { 69, 0x00000060, 7},
+    { 70, 0x00000061, 7},
+    { 71, 0x00000062, 7},
+    { 72, 0x00000063, 7},
+    { 73, 0x00000064, 7},
+    { 74, 0x00000065, 7},
+    { 75, 0x00000066, 7},
+    { 76, 0x00000067, 7},
+    { 77, 0x00000068, 7},
+    { 78, 0x00000069, 7},
+    { 79, 0x0000006a, 7},
+    { 80, 0x0000006b, 7},
+    { 81, 0x0000006c, 7},
+    { 82, 0x0000006d, 7},
+    { 83, 0x0000006e, 7},
+    { 84, 0x0000006f, 7},
+    { 85, 0x00000070, 7},
+    { 86, 0x00000071, 7},
+    { 87, 0x00000072, 7},
+    { 88, 0x000000fc, 8},
+    { 89, 0x00000073, 7},
+    { 90, 0x000000fd, 8},
+    { 91, 0x00001ffb, 13},
+    { 92, 0x0007fff0, 19},
+    { 93, 0x00001ffc, 13},
+    { 94, 0x00003ffc, 14},
+    { 95, 0x00000022, 6},
+    { 96, 0x00007ffd, 15},
+    { 97, 0x00000003, 5},
+    { 98, 0x00000023, 6},
+    { 99, 0x00000004, 5},
+    {100, 0x00000024, 6},
+    {101, 0x00000005, 5},
+    {102, 0x00000025, 6},
+    {103, 0x00000026, 6},
+    {104, 0x00000027, 6},
+    {105, 0x00000006, 5},
+    {106, 0x00000074, 7},
+    {107, 0x00000075, 7},
+    {108, 0x00000028, 6},
+    {109, 0x00000029, 6},
+    {110, 0x0000002a, 6},
+    {111, 0x00000007, 5},
+    {112, 0x0000002b, 6},
+    {113, 0x00000076, 7},
+    {114, 0x0000002c, 6},
+    {115, 0x00000008, 5},
+    {116, 0x00000009, 5},
+    {117, 0x0000002d, 6},
+    {118, 0x00000077, 7},
+    {119, 0x00000078, 7},
+    {120, 0x00000079, 7},
+    {121, 0x0000007a, 7},
+    {122, 0x0000007b, 7},
+    {123, 0x00007ffe, 15},
+    {124, 0x000007fc, 11},
+    {125, 0x00003ffd, 14},
+    {126, 0x00001ffd, 13},
+    {127, 0x0ffffffc, 28},
+    {128, 0x000fffe6, 20},
+    {129, 0x003fffd2, 22},
+    {130, 0x000fffe7, 20},
+    {131, 0x000fffe8, 20},
+    {132, 0x003fffd3, 22},
+    {133, 0x003fffd4, 22},
+    {134, 0x003fffd5, 22},
+    {135, 0x007fffd9, 23},
+    {136, 0x003fffd6, 22},
+    {137, 0x007fffda, 23},
+    {138, 0x007fffdb, 23},
+    {139, 0x007fffdc, 23},
+    {140, 0x007fffdd, 23},
+    {141, 0x007fffde, 23},
+    {142, 0x00ffffeb, 24},
+    {143, 0x007fffdf, 23},
+    {144, 0x00ffffec, 24},
+    {145, 0x00ffffed, 24},
+    {146, 0x003fffd7, 22},
+    {147, 0x007fffe0, 23},
+    {148, 0x00ffffee, 24},
+    {149, 0x007fffe1, 23},
+    {150, 0x007fffe2, 23},
+    {151, 0x007fffe3, 23},
+    {152, 0x007fffe4, 23},
+    {153, 0x001fffdc, 21},
+    {154, 0x003fffd8, 22},
+    {155, 0x007fffe5, 23},
+    {156, 0x003fffd9, 22},
+    {157, 0x007fffe6, 23},
+    {158, 0x007fffe7, 23},
+    {159, 0x00ffffef, 24},
+    {160, 0x003fffda, 22},
+    {161, 0x001fffdd, 21},
+    {162, 0x000fffe9, 20},
+    {163, 0x003fffdb, 22},
+    {164, 0x003fffdc, 22},
+    {165, 0x007fffe8, 23},
+    {166, 0x007fffe9, 23},
+    {167, 0x001fffde, 21},
+    {168, 0x007fffea, 23},
+    {169, 0x003fffdd, 22},
+    {170, 0x003fffde, 22},
+    {171, 0x00fffff0, 24},
+    {172, 0x001fffdf, 21},
+    {173, 0x003fffdf, 22},
+    {174, 0x007fffeb, 23},
+    {175, 0x007fffec, 23},
+    {176, 0x001fffe0, 21},
+    {177, 0x001fffe1, 21},
+    {178, 0x003fffe0, 22},
+    {179, 0x001fffe2, 21},
+    {180, 0x007fffed, 23},
+    {181, 0x003fffe1, 22},
+    {182, 0x007fffee, 23},
+    {183, 0x007fffef, 23},
+    {184, 0x000fffea, 20},
+    {185, 0x003fffe2, 22},
+    {186, 0x003fffe3, 22},
+    {187, 0x003fffe4, 22},
+    {188, 0x007ffff0, 23},
+    {189, 0x003fffe5, 22},
+    {190, 0x003fffe6, 22},
+    {191, 0x007ffff1, 23},
+    {192, 0x03ffffe0, 26},
+    {193, 0x03ffffe1, 26},
+    {194, 0x000fffeb, 20},
+    {195, 0x0007fff1, 19},
+    {196, 0x003fffe7, 22},
+    {197, 0x007ffff2, 23},
+    {198, 0x003fffe8, 22},
+    {199, 0x01ffffec, 25},
+    {200, 0x03ffffe2, 26},
+    {201, 0x03ffffe3, 26},
+    {202, 0x03ffffe4, 26},
+    {203, 0x07ffffde, 27},
+    {204, 0x07ffffdf, 27},
+    {205, 0x03ffffe5, 26},
+    {206, 0x00fffff1, 24},
+    {207, 0x01ffffed, 25},
+    {208, 0x0007fff2, 19},
+    {209, 0x001fffe3, 21},
+    {210, 0x03ffffe6, 26},
+    {211, 0x07ffffe0, 27},
+    {212, 0x07ffffe1, 27},
+    {213, 0x03ffffe7, 26},
+    {214, 0x07ffffe2, 27},
+    {215, 0x00fffff2, 24},
+    {216, 0x001fffe4, 21},
+    {217, 0x001fffe5, 21},
+    {218, 0x03ffffe8, 26},
+    {219, 0x03ffffe9, 26},
+    {220, 0x0ffffffd, 28},
+    {221, 0x07ffffe3, 27},
+    {222, 0x07ffffe4, 27},
+    {223, 0x07ffffe5, 27},
+    {224, 0x000fffec, 20},
+    {225, 0x00fffff3, 24},
+    {226, 0x000fffed, 20},
+    {227, 0x001fffe6, 21},
+    {228, 0x003fffe9, 22},
+    {229, 0x001fffe7, 21},
+    {230, 0x001fffe8, 21},
+    {231, 0x007ffff3, 23},
+    {232, 0x003fffea, 22},
+    {233, 0x003fffeb, 22},
+    {234, 0x01ffffee, 25},
+    {235, 0x01ffffef, 25},
+    {236, 0x00fffff4, 24},
+    {237, 0x00fffff5, 24},
+    {238, 0x03ffffea, 26},
+    {239, 0x007ffff4, 23},
+    {240, 0x03ffffeb, 26},
+    {241, 0x07ffffe6, 27},
+    {242, 0x03ffffec, 26},
+    {243, 0x03ffffed, 26},
+    {244, 0x07ffffe7, 27},
+    {245, 0x07ffffe8, 27},
+    {246, 0x07ffffe9, 27},
+    {247, 0x07ffffea, 27},
+    {248, 0x07ffffeb, 27},
+    {249, 0x0ffffffe, 28},
+    {250, 0x07ffffec, 27},
+    {251, 0x07ffffed, 27},
+    {252, 0x07ffffee, 27},
+    {253, 0x07ffffef, 27},
+    {254, 0x07fffff0, 27},
+    {255, 0x03ffffee, 26},
     {256, 0x3fffffff, 30}
 };
 //======================================================================
-static const unsigned int mask_table[] = {
+/*static const unsigned int mask_table[] = {
     0x00000000, // 0
     0x80000000, // 1
     0xc0000000, // 2
@@ -557,10 +557,10 @@ static const unsigned int mask_table[] = {
     0xfffffffe, // 31
     0xffffffff  // 32
 };
-
+*/
 static const int code_table_size = 256;
 //======================================================================
-static int find_char(const unsigned int in, int size, char *ch)
+/*static int find_char(const unsigned int in, int size, char *ch)
 {
     for (int i = 0; i < code_table_size; ++i)
     {
@@ -574,6 +574,144 @@ static int find_char(const unsigned int in, int size, char *ch)
     }
 
     return 0;
+}*/
+//======================================================================
+static int find_char(const unsigned int in, int size, char *ch)
+{
+    int len = 0;
+    if (in < 0x50000000)
+    {
+        unsigned int i = in >> 27;
+        *ch = huffman_decode_table[i][0];
+        len = 5;
+    }
+    else if (in < 0xb8000000)
+    {
+        int j = in >> 26;
+        *ch = huffman_decode_table[j - 10][0];
+        len = 6;
+    }
+    else if (in < 0xf8000000)
+    {
+        int j = (in >> 25) & 0x3f;
+        *ch = huffman_decode_table[8 + j][0];
+        len = 7;
+    }
+    else if (in < 0xfe000000)
+    {
+        int j = (in >> 24) & 0x07;
+        *ch = huffman_decode_table[68 + j][0];
+        len = 8;
+    }
+    else if (in < 0xff400000)
+    {
+        int j = (in >> 22) & 0x07;
+        *ch = huffman_decode_table[74 + j][0];
+        len = 10;
+    }
+    else if (in < 0xffa00000)
+    {
+        int j = (in >> 21) & 0x07;
+        *ch = huffman_decode_table[77 + j][0];
+        len = 11;
+    }
+    else if (in < 0xffc00000)
+    {
+        int j = (in & 0x00100000) ? 1 : 0;
+        *ch = huffman_decode_table[82 + j][0];
+        len = 12;
+    }
+    else if (in < 0xfff00000)
+    {
+        int j = (in >> 19) & 0x07;
+        *ch = huffman_decode_table[84 + j][0];
+        len = 13;
+    }
+    else if (in < 0xfff80000)
+    {
+        int j = (in & 0x00040000) ? 1 : 0;
+        *ch = huffman_decode_table[90 + j][0];
+        len = 14;
+    }
+    else if (in < 0xfffe0000)
+    {
+        int j = (in >> 17) & 0x03;
+        *ch = huffman_decode_table[92 + j][0];
+        len = 15;
+    }
+    else if (in < 0xfffe6000)
+    {
+        int j = (in >> 13) & 0x03;
+        *ch = huffman_decode_table[95 + j][0];
+        len = 19;
+    }
+    else if (in < 0xfffee000)
+    {
+        int j = (in >> 12) & 0x0f;
+        *ch = huffman_decode_table[92 + j][0];
+        len = 20;
+    }
+    else if (in < 0xffff4800)
+    {
+        int j = (in >> 11) & 0x3f;
+        *ch = huffman_decode_table[78 + j][0];
+        len = 21;
+    }
+    else if (in < 0xffffb000)
+    {
+        int j = (in >> 10) & 0x3f;
+        *ch = huffman_decode_table[101 + j][0];
+        len = 22;
+    }
+    else if (in < 0xffffea00)
+    {
+        int j = (in >> 9) & 0x3f;
+        *ch = huffman_decode_table[121 + j][0];
+        len = 23;
+    }
+    else if (in < 0xfffff600)
+    {
+        int j = (in >> 8) & 0x1f;
+        *ch = huffman_decode_table[164 + j][0];
+        len = 24;
+    }
+    else if (in < 0xfffff800)
+    {
+        int j = (in >> 7) & 0x03;
+        *ch = huffman_decode_table[186 + j][0];
+        len = 25;
+    }
+    else if (in < 0xfffffbc0)
+    {
+        int j = (in >> 6) & 0x0f;
+        *ch = huffman_decode_table[190 + j][0];
+        len = 26;
+    }
+    else if (in < 0xfffffe20)
+    {
+        int j = (in >> 5) & 0x3f;
+        *ch = huffman_decode_table[175 + j][0];
+        len = 27;
+    }
+    else if (in < 0xfffffff0)
+    {
+        int j = (in >> 4) & 0x1f;
+        *ch = huffman_decode_table[222 + j][0];
+        len = 28;
+    }
+    else if (in > 0xffffffe0)
+    {
+        int j = (in >> 2) & 0x03;
+        *ch = huffman_decode_table[253 + j][0];
+        len = 30;
+    }
+    else
+    {
+        fprintf(stderr, "<%s:%d> Error\n", __func__, __LINE__);
+        len = 0;
+    }
+
+    return len;
 }
 //======================================================================
 const unsigned char mask[8] = {0, 1, 0x03, 0x07, 0x0f, 0x1f, 0x3f, 0x7f};
@@ -588,7 +726,7 @@ void huffman_decode(const char *s, int len, std::string& out)
     int fifo_size = fifo_max_size;
     int buf_ind = 0;
 
-    for ( ; ; )
+    for ( int i = 0; i < 512; ++i)
     {
         for ( ; fifo_size > 0; )
         {
@@ -619,8 +757,21 @@ void huffman_decode(const char *s, int len, std::string& out)
             }
         }
 
+        int size = fifo_max_size - fifo_size;
+        if (size < 8)
+        {
+            if (size < 5)
+                return;
+            else if ((fifo_buf == 0xf8000000) && (size == 5))
+                return;
+            else if ((fifo_buf == 0xfc000000) && (size == 6))
+                return;
+            else if ((fifo_buf == 0xfe000000) && (size == 7))
+                return;
+        }
+
         char ch;
-        int n = find_char(fifo_buf, fifo_max_size - fifo_size, &ch);
+        int n = find_char(fifo_buf, size, &ch);
         if (n > 0)
         {
             out += ch;
@@ -636,7 +787,7 @@ int huffman_encode(const char *in, ByteArray& out)
 {
     out.init();
     int index;
-    unsigned int huff_buf;
+    int huff_buf;
     int buf_len;
     int ret = 0;
 
@@ -648,8 +799,6 @@ int huffman_encode(const char *in, ByteArray& out)
         index = (unsigned char)*(in++);
         huff_buf = huffman_encode_table[index][1];
         buf_len = huffman_encode_table[index][2];
-        //if (index > 127)
-        //    fprintf(stderr, "? utf-8 <%s:%d> index=%d\n", __func__, __LINE__, index);
         if (buf_len < 5)
         {
             fprintf(stderr, "<%s:%d> Error len=%d\n", __func__, __LINE__, buf_len);
