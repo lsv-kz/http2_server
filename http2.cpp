@@ -231,7 +231,7 @@ int EventHandlerClass::parse_frame(Connect *con)
                 int ind = i * 6;
                 if (con->h2.body.get_byte(ind + 1) == 1)
                 {
-                    int n = (unsigned char)con->h2.body.get_byte(ind + 5);
+                    long n = (unsigned char)con->h2.body.get_byte(ind + 5);
                     n += ((unsigned char)con->h2.body.get_byte(ind + 4)<<8);
                     n += ((unsigned char)con->h2.body.get_byte(ind + 3)<<16);
                     n += ((unsigned char)con->h2.body.get_byte(ind + 2)<<24);
