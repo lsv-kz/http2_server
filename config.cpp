@@ -464,7 +464,7 @@ int read_conf_file(FILE *fconf)
 
     const int fd_std = 3, fd_logs = 2, fd_sock = 1;
     long min_open_fd = fd_std + fd_logs + fd_sock;
-    int max_fd = min_open_fd + conf->MaxAcceptConnections * 2 + conf->MaxCgiProc * 2;
+    int max_fd = min_open_fd + conf->MaxAcceptConnections + conf->MaxAcceptConnections * conf->MaxConcurrentStreams + conf->MaxCgiProc * 2;
     n = set_max_fd(max_fd);
     if (n == -1)
         return -1;
