@@ -71,12 +71,18 @@ int EventHandlerClass::http2_connection(Connect *con)
             SSL_get0_alpn_selected(con->tls.ssl, &data, &datalen);
             if (data)
             {
-                unsigned int proto_alpn_len = proto_alpn[0];
-                if ((proto_alpn_len == datalen) && (!memcmp(proto_alpn + 1, data, datalen)))
+                unsigned int proto_alpn_len = sizeof(proto_alpn);
+                for ( unsigned int i = 0; i < proto_alpn_len; i += (unsigned int)(proto_alpn[i] + 1))
                 {
-                    con->h2.con_status = PREFACE_MESSAGE;
-                    con->sock_timer = 0;
-                    return 0;
+                    if (datalen != (unsigned int)proto_alpn[i])
+                        continue;
+                    if (memcmp(data, &proto_alpn[i + 1], datalen) == 0)
+                    {
+                        //hex_print_stderr(__func__, __LINE__, data, datalen);
+                        con->h2.con_status = PREFACE_MESSAGE;
+                        con->sock_timer = 0;
+                        return 0;
+                    }
                 }
 
                 hex_print_stderr(__func__, __LINE__, data, datalen);
@@ -178,6 +184,11 @@ int EventHandlerClass::recv_frame_(Connect *con)
                 ((unsigned char)con->h2.header[7]<<8) + (unsigned char)con->h2.header[8];
             if (conf->PrintDebugMsg)
                 hex_print_stderr(__func__, __LINE__, con->h2.header, 9);
+            if (con->h2.body_len > conf->DataBufSize)
+            {
+                print_err(con, "<%s:%d> Error frame size: %d\n", __func__, __LINE__, con->h2.body_len + 9);
+                return -1;
+            }
         }
         else
         {
@@ -186,9 +197,9 @@ int EventHandlerClass::recv_frame_(Connect *con)
         }
     }
 
-    char buf[16384];
     if (con->h2.body_len > 0)
     {
+        char buf[16384];
         int len_rd = (int)sizeof(buf);
         if (con->h2.body_len < len_rd)
             len_rd = con->h2.body_len;
@@ -289,7 +300,7 @@ int EventHandlerClass::parse_frame(Connect *con)
             return 0;
         }
 
-        if ((con->h2.body.size() == 0) && (con->h2.header[4] == 1))
+        if ((con->h2.body.size() == 0) && (con->h2.header[4] == FLAG_END_STREAM))
         {
             if ((resp->cgi_type <= PHPCGI) || (resp->cgi_type == SCGI))
             {

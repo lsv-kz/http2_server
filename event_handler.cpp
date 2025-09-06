@@ -633,8 +633,6 @@ void EventHandlerClass::close_connections()
         for ( ; con; con = next)
         {
             next = con->next;
-            shutdown(con->clientSocket, SHUT_RDWR);
-            close(con->clientSocket);
             if (con->tls.ssl)
             {
                 if((con->tls.err != SSL_ERROR_SSL) && (con->tls.err != SSL_ERROR_SYSCALL))
@@ -642,6 +640,8 @@ void EventHandlerClass::close_connections()
                 SSL_free(con->tls.ssl);
             }
 
+            shutdown(con->clientSocket, SHUT_RDWR);
+            close(con->clientSocket);
             delete con;
         }
     }
@@ -652,8 +652,6 @@ void EventHandlerClass::close_connections()
         for ( ; con; con = next)
         {
             next = con->next;
-            shutdown(con->clientSocket, SHUT_RDWR);
-            close(con->clientSocket);
             if (con->tls.ssl)
             {
                 if((con->tls.err != SSL_ERROR_SSL) && (con->tls.err != SSL_ERROR_SYSCALL))
@@ -661,6 +659,8 @@ void EventHandlerClass::close_connections()
                 SSL_free(con->tls.ssl);
             }
 
+            shutdown(con->clientSocket, SHUT_RDWR);
+            close(con->clientSocket);
             delete con;
         }
     }

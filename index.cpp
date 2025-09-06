@@ -220,6 +220,8 @@ void create_index_html(Connect *r, vector<string>& list, int numFiles, string& p
               "</html>");
 
     resp->send_cont_length = resp->html.size();
+    if (resp->method == "HEAD")
+        resp->html.init();
 }
 //======================================================================
 int index_dir(Connect *r, string& path, Stream *resp)

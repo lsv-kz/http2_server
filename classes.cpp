@@ -397,8 +397,14 @@ int http2::parse(Stream *r)
                 r->method = "POST";
             else if (strstr_case(val.c_str(), "get"))
                 r->method = "GET";
+            else if (strstr_case(val.c_str(), "head"))
+                r->method = "HEAD";
             else
+            {
                 r->method = val;
+                print_err("<%s:%d> Error Method: \"%s\"\n", __func__, __LINE__, val.c_str());
+                return -1;
+            }
         }
         else if (name == "path")
             r->path = val;

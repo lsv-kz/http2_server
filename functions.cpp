@@ -772,6 +772,14 @@ int set_frame_data(Connect *con, Stream *resp)
     {
         if (resp->send_headers == false)
             return 0;
+        if (resp->method == "HEAD")
+        {
+            resp->html.init();
+            resp->cgi.cgi_end = true;
+            set_frame_data(resp, 0, FLAG_END_STREAM);
+            return 0;
+        }
+
         if (resp->html.size_remain())
         {
             int len = resp->html.size_remain();
@@ -935,7 +943,7 @@ int set_response(Connect *con, Stream *resp)
             resp->cgi_type = PHPFPM;
         else
         {
-            resp_500(resp);
+            resp_404(resp);
             return 0;
         }
     }
@@ -986,7 +994,7 @@ int set_response(Connect *con, Stream *resp)
         add_header(resp, 18, "bytes");                                // "accept-ranges"
         add_header(resp, 24, "no-cache, no-store, must-revalidate");  // "cache-control"
 
-        if (resp->file_size == 0)
+        if ((resp->file_size == 0) || (resp->method == "HEAD"))
         {
             char flag = resp->headers.get_byte(4);
             resp->headers.set_byte(flag | FLAG_END_STREAM, 4);
@@ -1027,7 +1035,7 @@ int set_response(Connect *con, Stream *resp)
             add_header(resp, 54, conf->ServerSoftware.c_str());       // "server"
             add_header(resp, 33, get_time().c_str());                 // "date"
             add_header(resp, 46, resp->path.append("/").c_str());     // "location"
-            add_header(resp, 31, "text/plain");                       // "content-type"
+            add_header(resp, 31, "text/plain;charset=UTF-8");         // "content-type"
             resp->create_headers = true;
 
             ByteArray smg;
@@ -1055,9 +1063,15 @@ int set_response(Connect *con, Stream *resp)
         add_header(resp, 8);                                          // "200 OK"
         add_header(resp, 54, conf->ServerSoftware.c_str());           // "server"
         add_header(resp, 33, get_time().c_str());                     // "date"
-        add_header(resp, 31, "text/html");                            // "content-type"
+        add_header(resp, 31, "text/html;charset=UTF-8");              // "content-type"
         add_header(resp, 24, "no-cache, no-store, must-revalidate");  // "cache-control"
         resp->create_headers = true;
+
+        if (resp->method == "HEAD")
+        {
+            char flag = resp->headers.get_byte(4);
+            resp->headers.set_byte(flag | FLAG_END_STREAM, 4);
+        }
     }
     else if (resp->content == DYN_PAGE)
     {

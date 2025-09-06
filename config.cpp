@@ -59,7 +59,7 @@ void create_conf_file(const char *path)
     fprintf(f, "LogPath              ?\n");
     fprintf(f, "PidFilePath          ?\n\n");
 
-    fprintf(f, "####### UsePHP: n, php-fpm, php-cgi #######\n");
+    fprintf(f, "####### UsePHP: off, php-fpm, php-cgi #######\n");
     fprintf(f, "UsePHP     php-fpm\n");
     fprintf(f, "PathPHP    127.0.0.1:9000  # [php-fpm: 127.0.0.1:9000 (/var/run/php-fpm.sock)]\n\n");
 
@@ -333,7 +333,15 @@ int read_conf_file(FILE *fconf)
             else if ((s1 == "TimeoutCGI") && is_number(s2.c_str()))
                 s2 >> c.TimeoutCGI;
             else if (s1 == "UsePHP")
-                s2 >> c.UsePHP;
+            {
+                if ((s2 == "off") || (s2 == "php-fpm") || (s2 == "php-cgi"))
+                    s2 >> c.UsePHP;
+                else
+                {
+                    fprintf(stderr, "<%s:%d> Error read config file: [%s], line <%d>\n", __func__, __LINE__, ss.c_str(), line_);
+                    return -1;
+                }
+            }
             else if (s1 == "PathPHP")
                 s2 >> c.PathPHP;
             else if ((s1 == "ShowMediaFiles") && is_bool(s2.c_str()))

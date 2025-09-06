@@ -29,14 +29,19 @@ static int alpn_select_proto_cb(SSL *ssl, const unsigned char **out, unsigned ch
 {
     if (conf->PrintDebugMsg)
         hex_print_stderr(__func__, __LINE__, in, inlen);
-    unsigned int proto_alpn_len = sizeof(proto_alpn);
-    for ( unsigned int i = 0; (i + proto_alpn_len) <= inlen; i += (unsigned int)(in[i] + 1))
+    unsigned int proto_alpn_len = sizeof(proto_alpn);   
+    for ( unsigned int i = 0; i < proto_alpn_len; i += (unsigned int)(proto_alpn[i] + 1))
     {
-        if (memcmp(&in[i], proto_alpn, proto_alpn_len) == 0)
+        for (unsigned int j = 0; j < inlen; j += (unsigned int)(in[j] + 1))
         {
-            *out = (unsigned char *)&in[i + 1];
-            *outlen = in[i];
-            return SSL_TLSEXT_ERR_OK;
+            if (in[j] != proto_alpn[i])
+                continue;
+            if (memcmp(&in[j], &proto_alpn[i], in[j] + 1) == 0)
+            {
+                *out = (unsigned char *)&in[j + 1];
+                *outlen = in[j];
+                return SSL_TLSEXT_ERR_OK;
+            }
         }
     }
 

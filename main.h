@@ -57,6 +57,7 @@ const int  LIMIT_PARSE_REQ_THREADS = 128;
 const int  MAX_STREAM = 128;
 
 const char proto_alpn[] = { 2, 'h', '2' };
+
 const int hpack_mask = 0x40;
 
 enum { // request status
@@ -309,8 +310,6 @@ void fcgi_set_header(char *s, unsigned char type, int dataLen);
 int fcgi_create_connect(Stream *r);
 //----------------------------------------------------------------------
 void kill_chld(Stream *r);
-int cgi_fork(Stream *r, int* serv_cgi, int* cgi_serv);
-int cgi_create_proc(Connect *c, Stream *r);
 int iscgi(Stream *resp);
 //----------------------------------------------------------------------
 int read_conf_file(const char *path_conf);
