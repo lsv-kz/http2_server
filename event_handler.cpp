@@ -316,7 +316,6 @@ void EventHandlerClass::http2_set_poll()
             c->sock_timer = t;
 
         if ((c->h2.con_status == PREFACE_MESSAGE) ||
-                (c->h2.con_status == SSL_ACCEPT) ||
                 (c->h2.con_status == SSL_SHUTDOWN) ||
                 (c->h2.con_status == RECV_SETTINGS) ||
                 (c->h2.con_status == SEND_SETTINGS)
@@ -330,7 +329,7 @@ void EventHandlerClass::http2_set_poll()
         if ((t - c->sock_timer) >= Timeout)
         {
             print_err(c, "<%s:%d> Timeout=%ld, %s\n", __func__, __LINE__, t - c->sock_timer, get_str_operation(c->h2.con_status));
-            if ((c->h2.con_status == SSL_ACCEPT) || (c->h2.con_status == SSL_SHUTDOWN))
+            if (c->h2.con_status == SSL_SHUTDOWN)
                 close_connect(c);
             else
                 ssl_shutdown(c);
@@ -357,7 +356,7 @@ void EventHandlerClass::http2_set_poll()
                     if ((ret = recv_frame(c)) < 0)
                         break;
                 }
-                else if ((c->h2.con_status == SSL_ACCEPT) || (c->h2.con_status == PREFACE_MESSAGE) || (c->h2.con_status == SSL_SHUTDOWN))
+                else if ((c->h2.con_status == PREFACE_MESSAGE) || (c->h2.con_status == SSL_SHUTDOWN))
                 {
                     if ((ret = http2_connection(c)) < 0)
                         break;
@@ -371,7 +370,7 @@ void EventHandlerClass::http2_set_poll()
 
             poll_fd[num_wait].fd = c->clientSocket;
             poll_fd[num_wait].events = 0;
-            if ((c->h2.con_status == SSL_ACCEPT) || (c->h2.con_status == SSL_SHUTDOWN))
+            if (c->h2.con_status == SSL_SHUTDOWN)
                 poll_fd[num_wait].events = c->tls.poll_event;
             else if ((c->h2.con_status == PREFACE_MESSAGE) || (c->h2.con_status == RECV_SETTINGS))
                 poll_fd[num_wait].events = POLLIN;
@@ -463,8 +462,7 @@ int EventHandlerClass::http2_poll()
         if (revents & ((~POLLIN) & (~POLLOUT)))
         {
             print_err(con, "<%s:%d> !!! Error: events=0x%02x, revents=0x%02x, %s\n", __func__, __LINE__, poll_fd[conn_ind].events, revents, get_str_operation(con->h2.con_status));
-            if ((con->h2.con_status == SSL_ACCEPT) || 
-                (con->h2.con_status == SSL_SHUTDOWN))
+            if (con->h2.con_status == SSL_SHUTDOWN)
             {
                 close_connect(con);
             }
@@ -483,7 +481,7 @@ int EventHandlerClass::http2_poll()
         con->fd_revents = revents;
         if (poll_fd[conn_ind].revents & POLLIN)
         {
-            if ((con->h2.con_status == SSL_ACCEPT) || (con->h2.con_status == PREFACE_MESSAGE) || (con->h2.con_status == SSL_SHUTDOWN))
+            if ((con->h2.con_status == PREFACE_MESSAGE) || (con->h2.con_status == SSL_SHUTDOWN))
             {
                 if (http2_connection(con) < 0)
                     continue;
@@ -497,7 +495,7 @@ int EventHandlerClass::http2_poll()
 
         if (poll_fd[conn_ind].revents & POLLOUT)
         {
-            if ((con->h2.con_status == SSL_ACCEPT) || (con->h2.con_status == SSL_SHUTDOWN))
+            if (con->h2.con_status == SSL_SHUTDOWN)
             {
                 http2_connection(con);
             }

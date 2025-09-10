@@ -136,7 +136,7 @@ struct Stream
 
     unsigned long numConn;
     unsigned long numReq;
-    
+
     std::string remoteAddr;
     std::string remotePort;
 

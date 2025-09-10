@@ -39,62 +39,6 @@ int EventHandlerClass::http2_connection(Connect *con)
         }
         return 0;
     }
-    else if (con->h2.con_status == SSL_ACCEPT)
-    {
-        ERR_clear_error();
-        int ret = SSL_accept(con->tls.ssl);
-        if (ret < 1)
-        {
-            con->tls.err = SSL_get_error(con->tls.ssl, ret);
-            if (conf->PrintDebugMsg)
-                print_err(con, "<%s:%d> Error SSL_accept()=%d: %s\n", __func__, __LINE__, ret, ssl_strerror(con->tls.err));
-            if (con->tls.err == SSL_ERROR_WANT_READ)
-            {
-                con->tls.poll_event = POLLIN;
-            }
-            else if (con->tls.err == SSL_ERROR_WANT_WRITE)
-            {
-                con->tls.poll_event = POLLOUT;
-            }
-            else
-            {
-                if (conf->PrintDebugMsg == false)
-                    print_err(con, "<%s:%d> Error SSL_accept(): %s\n", __func__, __LINE__, ssl_strerror(con->tls.err));
-                close_connect(con);
-                return -1;
-            }
-        }
-        else
-        {
-            const unsigned char *data = NULL;
-            unsigned int datalen = 0;
-            SSL_get0_alpn_selected(con->tls.ssl, &data, &datalen);
-            if (data)
-            {
-                unsigned int proto_alpn_len = sizeof(proto_alpn);
-                for ( unsigned int i = 0; i < proto_alpn_len; i += (unsigned int)(proto_alpn[i] + 1))
-                {
-                    if (datalen != (unsigned int)proto_alpn[i])
-                        continue;
-                    if (memcmp(data, &proto_alpn[i + 1], datalen) == 0)
-                    {
-                        //hex_print_stderr(__func__, __LINE__, data, datalen);
-                        con->h2.con_status = PREFACE_MESSAGE;
-                        con->sock_timer = 0;
-                        return 0;
-                    }
-                }
-
-                hex_print_stderr(__func__, __LINE__, data, datalen);
-            }
-
-            print_err(con, "<%s:%d> Error: no protocol has been selected\n", __func__, __LINE__);
-            close_connect(con);
-            return -1;
-        }
-
-        return 0;
-    }
     else if (con->h2.con_status == SSL_SHUTDOWN)
     {
         ERR_clear_error();
@@ -746,7 +690,6 @@ int EventHandlerClass::send_frame_data(Connect *con, Stream *resp)
         resp->send_end_stream = true;
         print_log(resp);
         con->h2.close_stream(resp->id);
-        return 0;
     }
     else
         resp->data.init();
